@@ -3,39 +3,26 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Calls;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
-use Fleet\AstMatcher\Matchers\Nodes\ArgMatcher;
-use Fleet\AstMatcher\Matchers\Collections\TupleOfMatcher;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\MatchesArgs;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\FuncCall;
 
-class CallExpressionMatcher extends Matcher
+class CallExpressionMatcher extends NodeMatcher
 {
-    private $callee;
-    private $args;
+    use UnwrapsExpressionStatement;
+    use MatchesArgs;
 
-    public function __construct($callee = null, $args = null)
-    {
-        $this->callee = $callee;
-        $this->args = $args;
-    }
+    public function __construct(
+        private readonly ?Matcher $callee = null,
+        private readonly mixed    $args   = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return FuncCall::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isCallExpression($node)) {
-            return false;
-        }
-        if ($this->callee !== null && !$this->callee->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->args !== null) {
-            if (is_array($this->args)) {
-                $args = array_map(fn($a) => $a instanceof ArgMatcher ? $a : new ArgMatcher($a, null), $this->args);
-                if (!(new TupleOfMatcher(...$args))->matchValue($node->args, array_merge($keys, ['args']))) {
-                    return false;
-                }
-            } elseif (!$this->args->matchValue($node->args, array_merge($keys, ['args']))) {
-                return false;
-            }
-        }
-        return true;
+        return $this->matchField($this->callee, $node->name, $keys, 'name')
+            && $this->matchArgs($this->args, $node->args, $keys);
     }
 }

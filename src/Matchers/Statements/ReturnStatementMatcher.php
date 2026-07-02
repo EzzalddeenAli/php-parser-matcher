@@ -3,25 +3,19 @@
 namespace Fleet\AstMatcher\Matchers\Statements;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Return_;
 
-class ReturnStatementMatcher extends Matcher
+class ReturnStatementMatcher extends NodeMatcher
 {
-    private $argument;
+    public function __construct(
+        private readonly ?Matcher $argument = null,
+    ) {}
 
-    public function __construct($argument = null)
-    {
-        $this->argument = $argument;
-    }
+    protected function nodeClass(): string { return Return_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isReturnStatement($node)) {
-            return false;
-        }
-        if ($this->argument !== null&& !$this->argument->matchValue($node->expr, array_merge($keys, ['expr']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->argument, $node->expr, $keys, 'expr');
     }
 }

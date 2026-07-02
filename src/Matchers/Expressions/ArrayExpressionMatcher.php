@@ -2,34 +2,30 @@
 
 namespace Fleet\AstMatcher\Matchers\Expressions;
 
-use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
-use Fleet\AstMatcher\Matchers\Nodes\ArrayItemMatcher;
+use Fleet\AstMatcher\Core\NodeMatcher;
 use Fleet\AstMatcher\Matchers\Collections\TupleOfMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use Fleet\AstMatcher\Matchers\Nodes\ArrayItemMatcher;
+use PhpParser\Node\Expr\Array_;
 
-class ArrayExpressionMatcher extends Matcher
+class ArrayExpressionMatcher extends NodeMatcher
 {
-    private $elements;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($elements = null)
-    {
-        $this->elements = $elements;
-    }
+    public function __construct(
+        private readonly ?array $elements = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return Array_::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isArrayExpression($node)) {
-            return false;
-        }
-        if ($this->elements !== null) {
-            $wrapped = array_map(function ($el) {
-                return ($el instanceof ArrayItemMatcher) ? $el : new ArrayItemMatcher($el);
-            }, $this->elements);
-            $tuple = new TupleOfMatcher(...$wrapped);
-            if (!$tuple->matchValue($node->items, array_merge($keys, ['items']))) {
-                return false;
-            }
-        }
-        return true;
+        if ($this->elements === null) return true;
+
+        $wrapped = array_map(
+            static fn($el) => $el instanceof ArrayItemMatcher ? $el : new ArrayItemMatcher($el),
+            $this->elements
+        );
+        return (new TupleOfMatcher(...$wrapped))->matchValue($node->items, [...$keys, 'items']);
     }
 }

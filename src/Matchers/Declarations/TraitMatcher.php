@@ -3,31 +3,21 @@
 namespace Fleet\AstMatcher\Matchers\Declarations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
-use Fleet\AstMatcher\Matchers\Collections\AnyListMatcher;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Trait_;
 
-class TraitMatcher extends Matcher
+class TraitMatcher extends NodeMatcher
 {
-    private $name;
-    private $body;
+    public function __construct(
+        private readonly ?Matcher $name = null,
+        private readonly mixed    $body = null,
+    ) {}
 
-    public function __construct($name = null, $body = null)
-    {
-        $this->name = $name;
-        $this->body = $body;
-    }
+    protected function nodeClass(): string { return Trait_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isTrait($node)) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->body !== null && !$this->body->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->name, $node->name, $keys, 'name')
+            && $this->matchArrayField($this->body, $node->stmts, $keys, 'stmts');
     }
 }

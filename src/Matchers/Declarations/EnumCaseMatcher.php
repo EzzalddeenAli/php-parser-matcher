@@ -3,30 +3,21 @@
 namespace Fleet\AstMatcher\Matchers\Declarations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\EnumCase;
 
-class EnumCaseMatcher extends Matcher
+class EnumCaseMatcher extends NodeMatcher
 {
-    private $name;
-    private $expr;
+    public function __construct(
+        private readonly ?Matcher $name = null,
+        private readonly ?Matcher $expr = null,
+    ) {}
 
-    public function __construct($name = null, $expr = null)
-    {
-        $this->name = $name;
-        $this->expr = $expr;
-    }
+    protected function nodeClass(): string { return EnumCase::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isEnumCase($node)) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->expr !== null && !$this->expr->matchValue($node->expr, array_merge($keys, ['expr']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->name, $node->name, $keys, 'name')
+            && $this->matchField($this->expr, $node->expr, $keys, 'expr');
     }
 }

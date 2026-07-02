@@ -3,30 +3,24 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Access;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\ClassConstFetch;
 
-class ClassConstFetchMatcher extends Matcher
+class ClassConstFetchMatcher extends NodeMatcher
 {
-    private $object;
-    private $property;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($object = null, $property = null)
-    {
-        $this->object = $object;
-        $this->property = $property;
-    }
+    public function __construct(
+        private readonly ?Matcher $class    = null,
+        private readonly ?Matcher $property = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return ClassConstFetch::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isClassConstFetch($node)) {
-            return false;
-        }
-        if ($this->object !== null && !$this->object->matchValue($node->class, array_merge($keys, ['class']))) {
-            return false;
-        }
-        if ($this->property !== null && !$this->property->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->class,    $node->class, $keys, 'class')
+            && $this->matchField($this->property, $node->name,  $keys, 'name');
     }
 }

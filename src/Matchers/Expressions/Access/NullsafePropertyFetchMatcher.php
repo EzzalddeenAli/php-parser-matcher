@@ -3,30 +3,24 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Access;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\NullsafePropertyFetch;
 
-class NullsafePropertyFetchMatcher extends Matcher
+class NullsafePropertyFetchMatcher extends NodeMatcher
 {
-    private $object;
-    private $property;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($object = null, $property = null)
-    {
-        $this->object = $object;
-        $this->property = $property;
-    }
+    public function __construct(
+        private readonly ?Matcher $object   = null,
+        private readonly ?Matcher $property = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return NullsafePropertyFetch::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isNullsafePropertyFetch($node)) {
-            return false;
-        }
-        if ($this->object !== null && !$this->object->matchValue($node->var, array_merge($keys, ['var']))) {
-            return false;
-        }
-        if ($this->property !== null && !$this->property->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->object,   $node->var,  $keys, 'var')
+            && $this->matchField($this->property, $node->name, $keys, 'name');
     }
 }

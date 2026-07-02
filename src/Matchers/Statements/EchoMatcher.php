@@ -3,25 +3,19 @@
 namespace Fleet\AstMatcher\Matchers\Statements;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Echo_;
 
-class EchoMatcher extends Matcher
+class EchoMatcher extends NodeMatcher
 {
-    private $exprs;
+    public function __construct(
+        private readonly ?Matcher $exprs = null,
+    ) {}
 
-    public function __construct($exprs = null)
-    {
-        $this->exprs = $exprs;
-    }
+    protected function nodeClass(): string { return Echo_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isEcho($node)) {
-            return false;
-        }
-        if ($this->exprs !== null && !$this->exprs->matchValue($node->exprs, array_merge($keys, ['exprs']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->exprs, $node->exprs, $keys, 'exprs');
     }
 }

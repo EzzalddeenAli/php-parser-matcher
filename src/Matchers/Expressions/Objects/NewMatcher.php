@@ -3,45 +3,26 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Objects;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
-use Fleet\AstMatcher\Matchers\Nodes\ArgMatcher;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\MatchesArgs;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\New_;
 
-class NewMatcher extends Matcher
+class NewMatcher extends NodeMatcher
 {
-    private $class;
-    /**
-     * @var mixed|Matcher
-     */
-    private $args;
+    use UnwrapsExpressionStatement;
+    use MatchesArgs;
 
-    public function __construct($class = null, $args = null)
-    {
-        $this->class = $class;
-        $this->args = $args;
-    }
+    public function __construct(
+        private readonly ?Matcher $class = null,
+        private readonly mixed    $args  = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return New_::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isNew($node)) {
-            return false;
-        }
-        if ($this->class !== null && !$this->class->matchValue($node->class, array_merge($keys, ['class']))) {
-            return false;
-        }
-        if ($this->args !== null) {
-            $args = is_array($this->args) ? $this->args : null;
-            if ($args !== null) {
-                $wrapped = array_map(function ($a) {
-                    return ($a instanceof ArgMatcher) ? $a : new ArgMatcher($a, null);
-                }, $args);
-                $tuple = new \Fleet\AstMatcher\Matchers\Collections\TupleOfMatcher(...$wrapped);
-                if (!$tuple->matchValue($node->args, array_merge($keys, ['args']))) {
-                    return false;
-                }
-            } elseif (!$this->args->matchValue($node->args, array_merge($keys, ['args']))) {
-                return false;
-            }
-        }
-        return true;
+        return $this->matchField($this->class, $node->class, $keys, 'class')
+            && $this->matchArgs($this->args, $node->args, $keys);
     }
 }

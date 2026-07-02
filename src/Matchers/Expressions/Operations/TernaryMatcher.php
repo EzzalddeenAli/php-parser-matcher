@@ -3,35 +3,26 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Operations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\Ternary;
 
-class TernaryMatcher extends Matcher
+class TernaryMatcher extends NodeMatcher
 {
-    private $cond;
-    private $if;
-    private $else;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($cond = null, $if = null, $else = null)
-    {
-        $this->cond = $cond;
-        $this->if = $if;
-        $this->else = $else;
-    }
+    public function __construct(
+        private readonly ?Matcher $cond = null,
+        private readonly ?Matcher $if   = null,
+        private readonly ?Matcher $else = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return Ternary::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isTernary($node)) {
-            return false;
-        }
-        if ($this->cond !== null && !$this->cond->matchValue($node->cond, array_merge($keys, ['cond']))) {
-            return false;
-        }
-        if ($this->if !== null && !$this->if->matchValue($node->if, array_merge($keys, ['if']))) {
-            return false;
-        }
-        if ($this->else !== null && !$this->else->matchValue($node->else, array_merge($keys, ['else']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->cond, $node->cond, $keys, 'cond')
+            && $this->matchField($this->if,   $node->if,   $keys, 'if')
+            && $this->matchField($this->else, $node->else, $keys, 'else');
     }
 }

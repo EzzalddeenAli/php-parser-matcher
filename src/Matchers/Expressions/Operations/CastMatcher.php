@@ -3,43 +3,38 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Operations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\Cast;
 
-class CastMatcher extends Matcher
+class CastMatcher extends NodeMatcher
 {
-    private ?string $type;
-    private $expr;
+    use UnwrapsExpressionStatement;
 
     private static array $castMap = [
-        'int'    => \PhpParser\Node\Expr\Cast\Int_::class,
-        'float'  => \PhpParser\Node\Expr\Cast\Double::class,
-        'string' => \PhpParser\Node\Expr\Cast\String_::class,
-        'bool'   => \PhpParser\Node\Expr\Cast\Bool_::class,
-        'array'  => \PhpParser\Node\Expr\Cast\Array_::class,
-        'object' => \PhpParser\Node\Expr\Cast\Object_::class,
-        'unset'  => \PhpParser\Node\Expr\Cast\Unset_::class,
+        'int'    => Cast\Int_::class,
+        'float'  => Cast\Double::class,
+        'string' => Cast\String_::class,
+        'bool'   => Cast\Bool_::class,
+        'array'  => Cast\Array_::class,
+        'object' => Cast\Object_::class,
+        'unset'  => Cast\Unset_::class,
     ];
 
-    public function __construct(?string $type = null, $expr = null)
-    {
-        $this->type = $type;
-        $this->expr = $expr;
-    }
+    public function __construct(
+        private readonly ?string  $type = null,
+        private readonly ?Matcher $expr = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    // Matches any Cast subclass (Cast is the parent of all casts)
+    protected function nodeClass(): string { return Cast::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isCast($node)) {
-            return false;
-        }
         if ($this->type !== null) {
             $expectedClass = self::$castMap[strtolower($this->type)] ?? null;
-            if ($expectedClass && !($node instanceof $expectedClass)) {
-                return false;
-            }
+            if ($expectedClass !== null && !($node instanceof $expectedClass)) return false;
         }
-        if ($this->expr !== null && !$this->expr->matchValue($node->expr, array_merge($keys, ['expr']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->expr, $node->expr, $keys, 'expr');
     }
 }

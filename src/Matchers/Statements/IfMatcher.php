@@ -3,40 +3,25 @@
 namespace Fleet\AstMatcher\Matchers\Statements;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\If_;
 
-class IfMatcher extends Matcher
+class IfMatcher extends NodeMatcher
 {
-    private $cond;
-    private $then;
-    private $elseifs;
-    private $else;
+    public function __construct(
+        private readonly ?Matcher $cond    = null,
+        private readonly ?Matcher $then    = null,
+        private readonly ?Matcher $elseifs = null,
+        private readonly ?Matcher $else    = null,
+    ) {}
 
-    public function __construct($cond = null, $then = null, $elseifs = null, $else = null)
-    {
-        $this->cond    = $cond;
-        $this->then    = $then;
-        $this->elseifs = $elseifs;
-        $this->else    = $else;
-    }
+    protected function nodeClass(): string { return If_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isIf($node)) {
-            return false;
-        }
-        if ($this->cond !== null && !$this->cond->matchValue($node->cond, array_merge($keys, ['cond']))) {
-            return false;
-        }
-        if ($this->then !== null && !$this->then->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        if ($this->elseifs !== null && !$this->elseifs->matchValue($node->elseifs, array_merge($keys, ['elseifs']))) {
-            return false;
-        }
-        if ($this->else !== null && !$this->else->matchValue($node->else, array_merge($keys, ['else']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->cond,    $node->cond,    $keys, 'cond')
+            && $this->matchField($this->then,    $node->stmts,   $keys, 'stmts')
+            && $this->matchField($this->elseifs, $node->elseifs, $keys, 'elseifs')
+            && $this->matchField($this->else,    $node->else,    $keys, 'else');
     }
 }

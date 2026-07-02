@@ -3,25 +3,22 @@
 namespace Fleet\AstMatcher\Matchers\Expressions;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\Throw_;
 
-class ThrowExprMatcher extends Matcher
+class ThrowExprMatcher extends NodeMatcher
 {
-    private $expr;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($expr = null)
-    {
-        $this->expr = $expr;
-    }
+    public function __construct(
+        private readonly ?Matcher $expr = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return Throw_::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isThrow($node)) {
-            return false;
-        }
-        if ($this->expr !== null && !$this->expr->matchValue($node->expr, array_merge($keys, ['expr']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->expr, $node->expr, $keys, 'expr');
     }
 }

@@ -3,48 +3,28 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Calls;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
-use Fleet\AstMatcher\Matchers\Nodes\ArgMatcher;
-use Fleet\AstMatcher\Matchers\Collections\TupleOfMatcher;
-use PhpParser\Node\Stmt\Expression;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\MatchesArgs;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\StaticCall;
 
-class StaticCallMatcher extends Matcher
+class StaticCallMatcher extends NodeMatcher
 {
-    private $class;
-    private $name;
-    private $args;
+    use UnwrapsExpressionStatement;
+    use MatchesArgs;
 
-    public function __construct($class = null, $name = null, $args = null)
-    {
-        $this->class = $class;
-        $this->name = $name;
-        $this->args = $args;
-    }
+    public function __construct(
+        private readonly ?Matcher $class = null,
+        private readonly ?Matcher $name  = null,
+        private readonly mixed    $args  = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return StaticCall::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if ($node instanceof Expression && NodeTypes::isStaticCall($node->expr)) {
-            $node = $node->expr;
-        }
-        if (!NodeTypes::isNode($node) || !NodeTypes::isStaticCall($node)) {
-            return false;
-        }
-        if ($this->class !== null && !$this->class->matchValue($node->class, array_merge($keys, ['class']))) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->args !== null) {
-            if (is_array($this->args)) {
-                $args = array_map(fn($a) => $a instanceof ArgMatcher ? $a : new ArgMatcher($a, null), $this->args);
-                if (!(new TupleOfMatcher(...$args))->matchValue($node->args, array_merge($keys, ['args']))) {
-                    return false;
-                }
-            } elseif (!$this->args->matchValue($node->args, array_merge($keys, ['args']))) {
-                return false;
-            }
-        }
-        return true;
+        return $this->matchField($this->class, $node->class, $keys, 'class')
+            && $this->matchField($this->name,  $node->name,  $keys, 'name')
+            && $this->matchArgs($this->args, $node->args, $keys);
     }
 }

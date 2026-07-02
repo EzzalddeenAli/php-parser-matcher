@@ -3,43 +3,30 @@
 namespace Fleet\AstMatcher\Matchers\Declarations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Class_;
+use PhpParser\Node\Stmt\Property;
 
-class ClassPropertyMatcher extends Matcher
+class ClassPropertyMatcher extends NodeMatcher
 {
-    private $name;
-    private $default;
-    private $static;
+    public function __construct(
+        private readonly ?Matcher $name    = null,
+        private readonly ?Matcher $default = null,
+        private readonly ?bool    $static  = null,
+    ) {}
 
-    public function __construct($name = null, $default = null, $static = null)
-    {
-        $this->name = $name;
-        $this->default = $default;
-        $this->static = $static;
-    }
+    protected function nodeClass(): string { return Property::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isClassProperty($node)) {
-            return false;
+        if ($this->static !== null) {
+            $isStatic = (bool) ($node->flags & Class_::MODIFIER_STATIC);
+            if ($this->static !== $isStatic) return false;
         }
-        // ClassProperty is Stmt\Property — contains multiple props; check first prop
         $prop = $node->props[0] ?? null;
-        if ($prop === null) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($prop->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->default !== null && !$this->default->matchValue($prop->default, array_merge($keys, ['default']))) {
-            return false;
-        }
-        if ($this->static !== null && is_bool($this->static)) {
-            $isStatic = (bool)($node->flags & \PhpParser\Node\Stmt\Class_::MODIFIER_STATIC);
-            if ($this->static !== $isStatic) {
-                return false;
-            }
-        }
-        return true;
+        if ($prop === null) return false;
+
+        return $this->matchField($this->name,    $prop->name,    $keys, 'name')
+            && $this->matchField($this->default, $prop->default, $keys, 'default');
     }
 }

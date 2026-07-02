@@ -3,30 +3,21 @@
 namespace Fleet\AstMatcher\Matchers\Statements;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Do_;
 
-class DoWhileMatcher extends Matcher
+class DoWhileMatcher extends NodeMatcher
 {
-    private $body;
-    private $cond;
+    public function __construct(
+        private readonly ?Matcher $body = null,
+        private readonly ?Matcher $cond = null,
+    ) {}
 
-    public function __construct($body = null, $cond = null)
-    {
-        $this->body = $body;
-        $this->cond = $cond;
-    }
+    protected function nodeClass(): string { return Do_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isDoWhile($node)) {
-            return false;
-        }
-        if ($this->body !== null && !$this->body->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        if ($this->cond !== null && !$this->cond->matchValue($node->cond, array_merge($keys, ['cond']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->body, $node->stmts, $keys, 'stmts')
+            && $this->matchField($this->cond, $node->cond,  $keys, 'cond');
     }
 }

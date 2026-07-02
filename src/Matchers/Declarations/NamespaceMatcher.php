@@ -3,30 +3,21 @@
 namespace Fleet\AstMatcher\Matchers\Declarations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Namespace_;
 
-class NamespaceMatcher extends Matcher
+class NamespaceMatcher extends NodeMatcher
 {
-    private $name;
-    private $stmts;
+    public function __construct(
+        private readonly ?Matcher $name  = null,
+        private readonly ?Matcher $stmts = null,
+    ) {}
 
-    public function __construct($name = null, $stmts = null)
-    {
-        $this->name = $name;
-        $this->stmts = $stmts;
-    }
+    protected function nodeClass(): string { return Namespace_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isNamespace($node)) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->stmts !== null && !$this->stmts->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->name,  $node->name,  $keys, 'name')
+            && $this->matchField($this->stmts, $node->stmts, $keys, 'stmts');
     }
 }

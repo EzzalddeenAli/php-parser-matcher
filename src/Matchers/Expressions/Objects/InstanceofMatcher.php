@@ -3,30 +3,24 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Objects;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\Instanceof_;
 
-class InstanceofMatcher extends Matcher
+class InstanceofMatcher extends NodeMatcher
 {
-    private $expr;
-    private $class;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($expr = null, $class = null)
-    {
-        $this->expr = $expr;
-        $this->class = $class;
-    }
+    public function __construct(
+        private readonly ?Matcher $expr  = null,
+        private readonly ?Matcher $class = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return Instanceof_::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isInstanceof($node)) {
-            return false;
-        }
-        if ($this->expr !== null && !$this->expr->matchValue($node->expr, array_merge($keys, ['expr']))) {
-            return false;
-        }
-        if ($this->class !== null && !$this->class->matchValue($node->class, array_merge($keys, ['class']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->expr,  $node->expr,  $keys, 'expr')
+            && $this->matchField($this->class, $node->class, $keys, 'class');
     }
 }

@@ -3,34 +3,24 @@
 namespace Fleet\AstMatcher\Matchers\Declarations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Use_;
 
-class UseStatementMatcher extends Matcher
+class UseStatementMatcher extends NodeMatcher
 {
-    private $name;
-    private $alias;
+    public function __construct(
+        private readonly ?Matcher $name  = null,
+        private readonly ?Matcher $alias = null,
+    ) {}
 
-    public function __construct($name = null, $alias = null)
-    {
-        $this->name = $name;
-        $this->alias = $alias;
-    }
+    protected function nodeClass(): string { return Use_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isUseStatement($node)) {
-            return false;
-        }
         $use = $node->uses[0] ?? null;
-        if ($use === null) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($use->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->alias !== null && !$this->alias->matchValue($use->alias, array_merge($keys, ['alias']))) {
-            return false;
-        }
-        return true;
+        if ($use === null) return false;
+
+        return $this->matchField($this->name,  $use->name,  $keys, 'name')
+            && $this->matchField($this->alias, $use->alias, $keys, 'alias');
     }
 }

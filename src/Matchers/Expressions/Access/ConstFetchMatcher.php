@@ -2,29 +2,26 @@
 
 namespace Fleet\AstMatcher\Matchers\Expressions\Access;
 
-use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\ConstFetch;
 
-class ConstFetchMatcher extends Matcher
+class ConstFetchMatcher extends NodeMatcher
 {
-    private $name;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($name = null)
-    {
-        $this->name = $name;
-    }
+    public function __construct(
+        private readonly mixed $name = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return ConstFetch::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isConstFetch($node)) {
-            return false;
-        }
-        if ($this->name === null) {
-            return true;
-        }
+        if ($this->name === null) return true;
         if (is_string($this->name)) {
             return strtolower($node->name->toString()) === strtolower($this->name);
         }
-        return $this->name->matchValue($node->name, array_merge($keys, ['name']));
+        return $this->name->matchValue($node->name, [...$keys, 'name']);
     }
 }

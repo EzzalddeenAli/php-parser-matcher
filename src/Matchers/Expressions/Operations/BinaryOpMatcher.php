@@ -3,41 +3,33 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Operations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\BinaryOp;
 
-class BinaryOpMatcher extends Matcher
+class BinaryOpMatcher extends NodeMatcher
 {
-    private $operator;
-    private $left;
-    private $right;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($operator = null, $left = null, $right = null)
-    {
-        $this->operator = $operator;
-        $this->left = $left;
-        $this->right = $right;
-    }
+    public function __construct(
+        private readonly mixed    $operator = null,
+        private readonly ?Matcher $left     = null,
+        private readonly ?Matcher $right    = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    // Matches any BinaryOp subclass (BinaryOp is the parent of all binary ops)
+    protected function nodeClass(): string { return BinaryOp::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isBinaryOpExpression($node)) {
-            return false;
-        }
         if ($this->operator !== null) {
             if (is_string($this->operator)) {
-                if ($this->operator !== $node->getOperatorSigil()) {
-                    return false;
-                }
-            } elseif (!$this->operator->matchValue($node->getOperatorSigil(), array_merge($keys, ['operator']))) {
-                return false;
+                if ($this->operator !== $node->getOperatorSigil()) return false;
+            } else {
+                if (!$this->operator->matchValue($node->getOperatorSigil(), [...$keys, 'operator'])) return false;
             }
         }
-        if ($this->left !== null && !$this->left->matchValue($node->left, array_merge($keys, ['left']))) {
-            return false;
-        }
-        if ($this->right !== null && !$this->right->matchValue($node->right, array_merge($keys, ['right']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->left,  $node->left,  $keys, 'left')
+            && $this->matchField($this->right, $node->right, $keys, 'right');
     }
 }

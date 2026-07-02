@@ -3,35 +3,23 @@
 namespace Fleet\AstMatcher\Matchers\Declarations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Enum_;
 
-class EnumMatcher extends Matcher
+class EnumMatcher extends NodeMatcher
 {
-    private $name;
-    private $scalarType;
-    private $body;
+    public function __construct(
+        private readonly ?Matcher $name       = null,
+        private readonly ?Matcher $scalarType = null,
+        private readonly mixed    $body       = null,
+    ) {}
 
-    public function __construct($name = null, $scalarType = null, $body = null)
-    {
-        $this->name = $name;
-        $this->scalarType = $scalarType;
-        $this->body = $body;
-    }
+    protected function nodeClass(): string { return Enum_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isEnum($node)) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->scalarType !== null && !$this->scalarType->matchValue($node->scalarType, array_merge($keys, ['scalarType']))) {
-            return false;
-        }
-        if ($this->body !== null && !$this->body->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->name,       $node->name,       $keys, 'name')
+            && $this->matchField($this->scalarType, $node->scalarType, $keys, 'scalarType')
+            && $this->matchArrayField($this->body,  $node->stmts,      $keys, 'stmts');
     }
 }

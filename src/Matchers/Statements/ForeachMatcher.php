@@ -3,40 +3,25 @@
 namespace Fleet\AstMatcher\Matchers\Statements;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Foreach_;
 
-class ForeachMatcher extends Matcher
+class ForeachMatcher extends NodeMatcher
 {
-    private $expr;
-    private $valueVar;
-    private $keyVar;
-    private $body;
+    public function __construct(
+        private readonly ?Matcher $expr     = null,
+        private readonly ?Matcher $valueVar = null,
+        private readonly ?Matcher $keyVar   = null,
+        private readonly ?Matcher $body     = null,
+    ) {}
 
-    public function __construct($expr = null, $valueVar = null, $keyVar = null, $body = null)
-    {
-        $this->expr     = $expr;
-        $this->valueVar = $valueVar;
-        $this->keyVar   = $keyVar;
-        $this->body     = $body;
-    }
+    protected function nodeClass(): string { return Foreach_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isForeach($node)) {
-            return false;
-        }
-        if ($this->expr !== null && !$this->expr->matchValue($node->expr, array_merge($keys, ['expr']))) {
-            return false;
-        }
-        if ($this->valueVar !== null && !$this->valueVar->matchValue($node->valueVar, array_merge($keys, ['valueVar']))) {
-            return false;
-        }
-        if ($this->keyVar !== null && !$this->keyVar->matchValue($node->keyVar, array_merge($keys, ['keyVar']))) {
-            return false;
-        }
-        if ($this->body !== null && !$this->body->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->expr,     $node->expr,     $keys, 'expr')
+            && $this->matchField($this->valueVar, $node->valueVar, $keys, 'valueVar')
+            && $this->matchField($this->keyVar,   $node->keyVar,   $keys, 'keyVar')
+            && $this->matchField($this->body,     $node->stmts,    $keys, 'stmts');
     }
 }

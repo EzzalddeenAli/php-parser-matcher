@@ -3,30 +3,24 @@
 namespace Fleet\AstMatcher\Matchers\Expressions\Access;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\UnwrapsExpressionStatement;
+use PhpParser\Node\Expr\ArrayDimFetch;
 
-class ArrayDimFetchMatcher extends Matcher
+class ArrayDimFetchMatcher extends NodeMatcher
 {
-    private $var;
-    private $dim;
+    use UnwrapsExpressionStatement;
 
-    public function __construct($var = null, $dim = null)
-    {
-        $this->var = $var;
-        $this->dim = $dim;
-    }
+    public function __construct(
+        private readonly ?Matcher $var = null,
+        private readonly ?Matcher $dim = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return ArrayDimFetch::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isArrayDimFetch($node)) {
-            return false;
-        }
-        if ($this->var !== null && !$this->var->matchValue($node->var, array_merge($keys, ['var']))) {
-            return false;
-        }
-        if ($this->dim !== null && !$this->dim->matchValue($node->dim, array_merge($keys, ['dim']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->var, $node->var, $keys, 'var')
+            && $this->matchField($this->dim, $node->dim, $keys, 'dim');
     }
 }

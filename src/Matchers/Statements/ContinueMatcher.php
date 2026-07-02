@@ -3,25 +3,19 @@
 namespace Fleet\AstMatcher\Matchers\Statements;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Continue_;
 
-class ContinueMatcher extends Matcher
+class ContinueMatcher extends NodeMatcher
 {
-    private $num;
+    public function __construct(
+        private readonly ?Matcher $num = null,
+    ) {}
 
-    public function __construct($num = null)
-    {
-        $this->num = $num;
-    }
+    protected function nodeClass(): string { return Continue_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isContinue($node)) {
-            return false;
-        }
-        if ($this->num !== null && !$this->num->matchValue($node->num, array_merge($keys, ['num']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->num, $node->num, $keys, 'num');
     }
 }

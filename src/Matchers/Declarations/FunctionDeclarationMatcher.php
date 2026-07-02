@@ -3,43 +3,23 @@
 namespace Fleet\AstMatcher\Matchers\Declarations;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
-use Fleet\AstMatcher\Matchers\Collections\TupleOfMatcher;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Function_;
 
-class FunctionDeclarationMatcher extends Matcher
+class FunctionDeclarationMatcher extends NodeMatcher
 {
-    private $name;
-    private $params;
-    private $body;
+    public function __construct(
+        private readonly ?Matcher $name   = null,
+        private readonly mixed    $params = null,
+        private readonly ?Matcher $body   = null,
+    ) {}
 
-    public function __construct($name = null, $params = null, $body = null)
-    {
-        $this->name = $name;
-        $this->params = $params;
-        $this->body = $body;
-    }
+    protected function nodeClass(): string { return Function_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isFunctionDeclaration($node)) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->params !== null) {
-            if (is_array($this->params)) {
-                $tuple = new TupleOfMatcher(...$this->params);
-                if (!$tuple->matchValue($node->params, array_merge($keys, ['params']))) {
-                    return false;
-                }
-            } elseif (!$this->params->matchValue($node->params, array_merge($keys, ['params']))) {
-                return false;
-            }
-        }
-        if ($this->body !== null && !$this->body->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->name, $node->name, $keys, 'name')
+            && $this->matchArrayField($this->params, $node->params, $keys, 'params')
+            && $this->matchField($this->body, $node->stmts, $keys, 'stmts');
     }
 }
