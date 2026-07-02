@@ -6,8 +6,174 @@ use Fleet\AstMatcher\Testing\AstTestRunner;
 
 include __DIR__ . '/../vendor/autoload.php';
 
+trait ControlFlowExamples
+{
+    #[Example('if_: مضاهاة if بسيط')]
+    public function exampleIf(): void
+    {
+        $matcher = Ast::if(Ast::variable('flag'));
+        $this->assertMatches($matcher, 'if ($flag) {}');
+        $this->assertNotMatches($matcher, 'while ($flag) {}');
+    }
+
+    #[Example('if_: مضاهاة if مع else')]
+    public function exampleIfElse(): void
+    {
+        $matcher = Ast::if(
+            Ast::variable('x'),
+            null,
+            null,
+            Ast::else()
+        );
+        $this->assertMatches($matcher, 'if ($x) { foo(); } else { bar(); }');
+        $this->assertNotMatches($matcher, 'if ($x) { foo(); }');
+    }
+
+    #[Example('if_: مضاهاة if مع elseif')]
+    public function exampleIfElseIf(): void
+    {
+        $elseifs = Ast::anyList(Ast::elseIf(Ast::variable('y')));
+        $matcher = Ast::if(Ast::variable('x'), null, $elseifs);
+        $this->assertMatches($matcher, 'if ($x) {} elseif ($y) {}');
+        $this->assertNotMatches($matcher, 'if ($x) {}');
+    }
+
+    #[Example('foreach_: مضاهاة foreach (null keyVar = wildcard يطابق مع وبدون key)')]
+    public function exampleForeach(): void
+    {
+        $matcher = Ast::foreach(
+            Ast::variable('items'),
+            Ast::variable('item')
+        );
+        // null keyVar = wildcard — يطابق مع أو بدون key
+        $this->assertMatches($matcher, 'foreach ($items as $item) {}');
+        $this->assertMatches($matcher, 'foreach ($items as $k => $item) {}');
+        // خطأ في الـ valueVar يفشل
+        $this->assertNotMatches($matcher, 'foreach ($items as $row) {}');
+    }
+
+    #[Example('foreach_: مضاهاة foreach مع key')]
+    public function exampleForeachWithKey(): void
+    {
+        $matcher = Ast::foreach(
+            null,
+            Ast::variable('value'),
+            Ast::variable('key')
+        );
+        $this->assertMatches($matcher, 'foreach ($items as $key => $value) {}');
+        $this->assertMatches($matcher, 'foreach ($rows as $key => $value) { doSomething($key); }');
+    }
+
+    #[Example('while_: مضاهاة while loop')]
+    public function exampleWhile(): void
+    {
+        $matcher = Ast::while(Ast::variable('running'));
+        $this->assertMatches($matcher, 'while ($running) { process(); }');
+        $this->assertNotMatches($matcher, 'do { process(); } while ($running);');
+    }
+
+    #[Example('doWhile: مضاهاة do-while loop')]
+    public function exampleDoWhile(): void
+    {
+        $matcher = Ast::doWhile(null, Ast::variable('running'));
+        $this->assertMatches($matcher, 'do { process(); } while ($running);');
+        $this->assertNotMatches($matcher, 'while ($running) { process(); }');
+    }
+
+    #[Example('for_: مضاهاة for loop')]
+    public function exampleFor(): void
+    {
+        $matcher = Ast::for();
+        $this->assertMatches($matcher, 'for ($i = 0; $i < 10; $i++) {}');
+        $this->assertNotMatches($matcher, 'foreach ($a as $b) {}');
+    }
+
+    #[Example('tryCatch: مضاهاة try-catch')]
+    public function exampleTryCatch(): void
+    {
+        $matcher = Ast::tryCatch(
+            null,
+            Ast::anyList(Ast::catch())
+        );
+        $this->assertMatches($matcher, 'try { foo(); } catch (Exception $e) { bar(); }');
+        $this->assertNotMatches($matcher, 'try { foo(); } finally { bar(); }');
+    }
+
+    #[Example('tryCatch: مضاهاة try-catch مع finally')]
+    public function exampleTryCatchFinally(): void
+    {
+        $matcher = Ast::tryCatch(
+            null,
+            null,
+            Ast::finally()
+        );
+        $this->assertMatches($matcher, 'try { foo(); } finally { cleanup(); }');
+        $this->assertMatches($matcher, 'try { foo(); } catch (Exception $e) {} finally { cleanup(); }');
+    }
+
+    #[Example('catch_: مضاهاة catch مع نوع محدد')]
+    public function exampleCatch(): void
+    {
+        $matcher = Ast::tryCatch(
+            null,
+            Ast::anyList(
+                Ast::catch(null, Ast::variable('e'))
+            )
+        );
+        $this->assertMatches($matcher, 'try { foo(); } catch (RuntimeException $e) { handle($e); }');
+    }
+
+    #[Example('switch_: مضاهاة switch')]
+    public function exampleSwitch(): void
+    {
+        $matcher = Ast::switch(Ast::variable('status'));
+        $this->assertMatches($matcher, 'switch ($status) { case 1: break; case 2: break; }');
+        $this->assertNotMatches($matcher, 'match ($status) { 1 => foo(), 2 => bar() }');
+    }
+
+    #[Example('switch_: مضاهاة switch مع case محدد')]
+    public function exampleSwitchWithCase(): void
+    {
+        $matcher = Ast::switch(
+            null,
+            Ast::anyList(
+                Ast::zeroOrMore(Ast::case()),
+                Ast::case(Ast::stringLiteral('active'))
+            )
+        );
+        $this->assertMatches($matcher, "switch (\$s) { case 'active': echo 'yes'; break; }");
+        $this->assertMatches($matcher, "switch (\$s) { case 'pending': break; case 'active': echo 'yes'; break; }");
+    }
+
+    #[Example('echo_: مضاهاة echo statement')]
+    public function exampleEcho(): void
+    {
+        $matcher = Ast::echo();
+        $this->assertMatches($matcher, 'echo "hello";');
+        $this->assertMatches($matcher, 'echo $a, $b;');
+        $this->assertNotMatches($matcher, 'print "hello";');
+    }
+
+    #[Example('break_: مضاهاة break statement')]
+    public function exampleBreak(): void
+    {
+        $matcher = Ast::break();
+        $this->assertMatches($matcher, 'break;');
+        $this->assertMatches($matcher, 'break 2;');
+        $this->assertNotMatches($matcher, 'continue;');
+    }
+
+    #[Example('continue_: مضاهاة continue statement')]
+    public function exampleContinue(): void
+    {
+        $matcher = Ast::continue();
+        $this->assertMatches($matcher, 'continue;');
+        $this->assertNotMatches($matcher, 'break;');
+    }
+}
 class MatcherExamples extends AstTestRunner
 {
+    use ControlFlowExamples;
     #[Example('مضاهاة دالة HasMany::make مع استخدام الترجمة __()')]
     public function exampleHasManyNode(): void
     {
@@ -272,7 +438,7 @@ class MatcherExamples extends AstTestRunner
                 Ast::arg(Ast::binaryOp(
                     "??",
                     Ast::propertyFetch(Ast::variable('this'), Ast::name("newFields")),
-                    Ast::array_([])
+                    Ast::array([])
                 )),
             ],
         );
@@ -523,170 +689,4 @@ TXT
 
 MatcherExamples::run();
 
-class ControlFlowExamples extends AstTestRunner
-{
-    #[Example('if_: مضاهاة if بسيط')]
-    public function exampleIf(): void
-    {
-        $matcher = Ast::if_(Ast::variable('flag'));
-        $this->assertMatches($matcher, 'if ($flag) {}');
-        $this->assertNotMatches($matcher, 'while ($flag) {}');
-    }
 
-    #[Example('if_: مضاهاة if مع else')]
-    public function exampleIfElse(): void
-    {
-        $matcher = Ast::if_(
-            Ast::variable('x'),
-            null,
-            null,
-            Ast::else_()
-        );
-        $this->assertMatches($matcher, 'if ($x) { foo(); } else { bar(); }');
-        $this->assertNotMatches($matcher, 'if ($x) { foo(); }');
-    }
-
-    #[Example('if_: مضاهاة if مع elseif')]
-    public function exampleIfElseIf(): void
-    {
-        $elseifs = Ast::anyList(Ast::elseIf_(Ast::variable('y')));
-        $matcher = Ast::if_(Ast::variable('x'), null, $elseifs);
-        $this->assertMatches($matcher, 'if ($x) {} elseif ($y) {}');
-        $this->assertNotMatches($matcher, 'if ($x) {}');
-    }
-
-    #[Example('foreach_: مضاهاة foreach (null keyVar = wildcard يطابق مع وبدون key)')]
-    public function exampleForeach(): void
-    {
-        $matcher = Ast::foreach_(
-            Ast::variable('items'),
-            Ast::variable('item')
-        );
-        // null keyVar = wildcard — يطابق مع أو بدون key
-        $this->assertMatches($matcher, 'foreach ($items as $item) {}');
-        $this->assertMatches($matcher, 'foreach ($items as $k => $item) {}');
-        // خطأ في الـ valueVar يفشل
-        $this->assertNotMatches($matcher, 'foreach ($items as $row) {}');
-    }
-
-    #[Example('foreach_: مضاهاة foreach مع key')]
-    public function exampleForeachWithKey(): void
-    {
-        $matcher = Ast::foreach_(
-            null,
-            Ast::variable('value'),
-            Ast::variable('key')
-        );
-        $this->assertMatches($matcher, 'foreach ($items as $key => $value) {}');
-        $this->assertMatches($matcher, 'foreach ($rows as $key => $value) { doSomething($key); }');
-    }
-
-    #[Example('while_: مضاهاة while loop')]
-    public function exampleWhile(): void
-    {
-        $matcher = Ast::while_(Ast::variable('running'));
-        $this->assertMatches($matcher, 'while ($running) { process(); }');
-        $this->assertNotMatches($matcher, 'do { process(); } while ($running);');
-    }
-
-    #[Example('doWhile: مضاهاة do-while loop')]
-    public function exampleDoWhile(): void
-    {
-        $matcher = Ast::doWhile(null, Ast::variable('running'));
-        $this->assertMatches($matcher, 'do { process(); } while ($running);');
-        $this->assertNotMatches($matcher, 'while ($running) { process(); }');
-    }
-
-    #[Example('for_: مضاهاة for loop')]
-    public function exampleFor(): void
-    {
-        $matcher = Ast::for_();
-        $this->assertMatches($matcher, 'for ($i = 0; $i < 10; $i++) {}');
-        $this->assertNotMatches($matcher, 'foreach ($a as $b) {}');
-    }
-
-    #[Example('tryCatch: مضاهاة try-catch')]
-    public function exampleTryCatch(): void
-    {
-        $matcher = Ast::tryCatch(
-            null,
-            Ast::anyList(Ast::catch_())
-        );
-        $this->assertMatches($matcher, 'try { foo(); } catch (Exception $e) { bar(); }');
-        $this->assertNotMatches($matcher, 'try { foo(); } finally { bar(); }');
-    }
-
-    #[Example('tryCatch: مضاهاة try-catch مع finally')]
-    public function exampleTryCatchFinally(): void
-    {
-        $matcher = Ast::tryCatch(
-            null,
-            null,
-            Ast::finally_()
-        );
-        $this->assertMatches($matcher, 'try { foo(); } finally { cleanup(); }');
-        $this->assertMatches($matcher, 'try { foo(); } catch (Exception $e) {} finally { cleanup(); }');
-    }
-
-    #[Example('catch_: مضاهاة catch مع نوع محدد')]
-    public function exampleCatch(): void
-    {
-        $matcher = Ast::tryCatch(
-            null,
-            Ast::anyList(
-                Ast::catch_(null, Ast::variable('e'))
-            )
-        );
-        $this->assertMatches($matcher, 'try { foo(); } catch (RuntimeException $e) { handle($e); }');
-    }
-
-    #[Example('switch_: مضاهاة switch')]
-    public function exampleSwitch(): void
-    {
-        $matcher = Ast::switch_(Ast::variable('status'));
-        $this->assertMatches($matcher, 'switch ($status) { case 1: break; case 2: break; }');
-        $this->assertNotMatches($matcher, 'match ($status) { 1 => foo(), 2 => bar() }');
-    }
-
-    #[Example('switch_: مضاهاة switch مع case محدد')]
-    public function exampleSwitchWithCase(): void
-    {
-        $matcher = Ast::switch_(
-            null,
-            Ast::anyList(
-                Ast::zeroOrMore(Ast::case_()),
-                Ast::case_(Ast::stringLiteral('active'))
-            )
-        );
-        $this->assertMatches($matcher, "switch (\$s) { case 'active': echo 'yes'; break; }");
-        $this->assertMatches($matcher, "switch (\$s) { case 'pending': break; case 'active': echo 'yes'; break; }");
-    }
-
-    #[Example('echo_: مضاهاة echo statement')]
-    public function exampleEcho(): void
-    {
-        $matcher = Ast::echo_();
-        $this->assertMatches($matcher, 'echo "hello";');
-        $this->assertMatches($matcher, 'echo $a, $b;');
-        $this->assertNotMatches($matcher, 'print "hello";');
-    }
-
-    #[Example('break_: مضاهاة break statement')]
-    public function exampleBreak(): void
-    {
-        $matcher = Ast::break_();
-        $this->assertMatches($matcher, 'break;');
-        $this->assertMatches($matcher, 'break 2;');
-        $this->assertNotMatches($matcher, 'continue;');
-    }
-
-    #[Example('continue_: مضاهاة continue statement')]
-    public function exampleContinue(): void
-    {
-        $matcher = Ast::continue_();
-        $this->assertMatches($matcher, 'continue;');
-        $this->assertNotMatches($matcher, 'break;');
-    }
-}
-
-ControlFlowExamples::run();
