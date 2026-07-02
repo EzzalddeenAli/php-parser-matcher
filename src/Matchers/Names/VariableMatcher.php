@@ -2,29 +2,21 @@
 
 namespace Fleet\AstMatcher\Matchers\Names;
 
-use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Expr\Variable;
 
-class VariableMatcher extends Matcher
+class VariableMatcher extends NodeMatcher
 {
-    private $name;
+    public function __construct(
+        private readonly mixed $name = null,
+    ) {}
 
-    public function __construct($name = null)
-    {
-        $this->name = $name;
-    }
+    protected function nodeClass(): string { return Variable::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isVariable($node)) {
-            return false;
-        }
-        if ($this->name === null) {
-            return true;
-        }
-        if (is_string($this->name)) {
-            return $this->name === $node->name;
-        }
-        return $this->name->matchValue($node->name, array_merge($keys, ['name']));
+        if ($this->name === null) return true;
+        if (is_string($this->name)) return $this->name === $node->name;
+        return $this->name->matchValue($node->name, [...$keys, 'name']);
     }
 }
