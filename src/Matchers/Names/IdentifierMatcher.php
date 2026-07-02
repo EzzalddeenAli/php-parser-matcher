@@ -2,29 +2,27 @@
 
 namespace Fleet\AstMatcher\Matchers\Names;
 
-use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
 
-class IdentifierMatcher extends Matcher
+class IdentifierMatcher extends NodeMatcher
 {
-    private $name;
+    public function __construct(
+        private readonly mixed $name = null,
+    ) {}
 
-    public function __construct($name = null)
+    protected function matchesNodeType(mixed $node): bool
     {
-        $this->name = $name;
+        return $node instanceof Identifier || $node instanceof Name;
     }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !(NodeTypes::isIdentifier($node) || NodeTypes::isName($node))) {
-            return false;
-        }
-        if ($this->name === null) {
-            return true;
-        }
+        if ($this->name === null) return true;
         if (is_string($this->name)) {
             return $this->name === $node->name || $this->name === $node->toString();
         }
-        return $this->name->matchValue($node->name, array_merge($keys, ['name']));
+        return $this->name->matchValue($node->name, [...$keys, 'name']);
     }
 }

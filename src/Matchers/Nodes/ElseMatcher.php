@@ -3,25 +3,19 @@
 namespace Fleet\AstMatcher\Matchers\Nodes;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Else_;
 
-class ElseMatcher extends Matcher
+class ElseMatcher extends NodeMatcher
 {
-    private $body;
+    public function __construct(
+        private readonly ?Matcher $body = null,
+    ) {}
 
-    public function __construct($body = null)
-    {
-        $this->body = $body;
-    }
+    protected function nodeClass(): string { return Else_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isElse($node)) {
-            return false;
-        }
-        if ($this->body !== null && !$this->body->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->body, $node->stmts, $keys, 'stmts');
     }
 }

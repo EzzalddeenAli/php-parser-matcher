@@ -3,35 +3,21 @@
 namespace Fleet\AstMatcher\Matchers\Nodes;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Case_;
 
-class CaseMatcher extends Matcher
+class CaseMatcher extends NodeMatcher
 {
-    private $cond;
-    private $body;
+    public function __construct(
+        private readonly ?Matcher $cond = null,
+        private readonly ?Matcher $body = null,
+    ) {}
 
-    /**
-     * @param $cond null = matches any case (including default); use explicit null matcher for `default:` only
-     * @param $body matcher for the case stmts array
-     */
-    public function __construct($cond = null, $body = null)
-    {
-        $this->cond = $cond;
-        $this->body = $body;
-    }
+    protected function nodeClass(): string { return Case_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isCase($node)) {
-            return false;
-        }
-        // $node->cond is null for `default:` case
-        if ($this->cond !== null && !$this->cond->matchValue($node->cond, array_merge($keys, ['cond']))) {
-            return false;
-        }
-        if ($this->body !== null && !$this->body->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->cond, $node->cond,  $keys, 'cond')
+            && $this->matchField($this->body, $node->stmts, $keys, 'stmts');
     }
 }

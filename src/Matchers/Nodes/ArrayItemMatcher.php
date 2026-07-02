@@ -3,30 +3,21 @@
 namespace Fleet\AstMatcher\Matchers\Nodes;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\ArrayItem;
 
-class ArrayItemMatcher extends Matcher
+class ArrayItemMatcher extends NodeMatcher
 {
-    private $value;
-    private $key;
+    public function __construct(
+        private readonly ?Matcher $value = null,
+        private readonly ?Matcher $key   = null,
+    ) {}
 
-    public function __construct($value = null, $key = null)
-    {
-        $this->value = $value;
-        $this->key = $key;
-    }
+    protected function nodeClass(): string { return ArrayItem::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isArrayItem($node)) {
-            return false;
-        }
-        if ($this->value !== null && !$this->value->matchValue($node->value, array_merge($keys, ['value']))) {
-            return false;
-        }
-        if ($this->key !== null && !$this->key->matchValue($node->key, array_merge($keys, ['key']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->value, $node->value, $keys, 'value')
+            && $this->matchField($this->key,   $node->key,   $keys, 'key');
     }
 }

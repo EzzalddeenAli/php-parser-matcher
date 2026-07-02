@@ -3,25 +3,19 @@
 namespace Fleet\AstMatcher\Matchers\Nodes;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\TraitUse;
 
-class TraitUseMatcher extends Matcher
+class TraitUseMatcher extends NodeMatcher
 {
-    private $traits;
+    public function __construct(
+        private readonly ?Matcher $traits = null,
+    ) {}
 
-    public function __construct($traits = null)
-    {
-        $this->traits = $traits;
-    }
+    protected function nodeClass(): string { return TraitUse::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isTraitUse($node)) {
-            return false;
-        }
-        if ($this->traits !== null && !$this->traits->matchValue($node->traits, array_merge($keys, ['traits']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->traits, $node->traits, $keys, 'traits');
     }
 }

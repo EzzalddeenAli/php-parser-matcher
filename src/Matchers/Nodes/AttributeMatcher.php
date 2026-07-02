@@ -3,41 +3,24 @@
 namespace Fleet\AstMatcher\Matchers\Nodes;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
-use Fleet\AstMatcher\Matchers\Collections\TupleOfMatcher;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use Fleet\AstMatcher\Matchers\Concerns\MatchesArgs;
+use PhpParser\Node\Attribute;
 
-class AttributeMatcher extends Matcher
+class AttributeMatcher extends NodeMatcher
 {
-    private $name;
-    private $args;
+    use MatchesArgs;
 
-    public function __construct($name = null, $args = null)
-    {
-        $this->name = $name;
-        $this->args = $args;
-    }
+    public function __construct(
+        private readonly ?Matcher $name = null,
+        private readonly mixed    $args = null,
+    ) {}
 
-    public function matchValue($node, $keys = []): bool
+    protected function nodeClass(): string { return Attribute::class; }
+
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isAttribute($node)) {
-            return false;
-        }
-        if ($this->name !== null && !$this->name->matchValue($node->name, array_merge($keys, ['name']))) {
-            return false;
-        }
-        if ($this->args !== null) {
-            if (is_array($this->args)) {
-                $wrapped = array_map(function ($a) {
-                    return ($a instanceof ArgMatcher) ? $a : new ArgMatcher($a, null);
-                }, $this->args);
-                $tuple = new TupleOfMatcher(...$wrapped);
-                if (!$tuple->matchValue($node->args, array_merge($keys, ['args']))) {
-                    return false;
-                }
-            } elseif (!$this->args->matchValue($node->args, array_merge($keys, ['args']))) {
-                return false;
-            }
-        }
-        return true;
+        return $this->matchField($this->name, $node->name, $keys, 'name')
+            && $this->matchArgs($this->args, $node->args, $keys);
     }
 }

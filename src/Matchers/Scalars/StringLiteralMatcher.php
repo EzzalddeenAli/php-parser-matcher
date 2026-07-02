@@ -2,29 +2,21 @@
 
 namespace Fleet\AstMatcher\Matchers\Scalars;
 
-use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Scalar\String_;
 
-class StringLiteralMatcher extends Matcher
+class StringLiteralMatcher extends NodeMatcher
 {
-    private $value;
+    public function __construct(
+        private readonly mixed $value = null,
+    ) {}
 
-    public function __construct($value = null)
-    {
-        $this->value = $value;
-    }
+    protected function nodeClass(): string { return String_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isStringLiteral($node)) {
-            return false;
-        }
-        if ($this->value === null) {
-            return true;
-        }
-        if (is_string($this->value)) {
-            return $this->value === $node->value;
-        }
-        return $this->value->matchValue($node->value, array_merge($keys, ['value']));
+        if ($this->value === null) return true;
+        if (is_string($this->value)) return $this->value === $node->value;
+        return $this->value->matchValue($node->value, [...$keys, 'value']);
     }
 }

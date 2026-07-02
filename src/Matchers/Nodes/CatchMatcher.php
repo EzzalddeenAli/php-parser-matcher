@@ -3,36 +3,23 @@
 namespace Fleet\AstMatcher\Matchers\Nodes;
 
 use Fleet\AstMatcher\Core\Matcher;
-use Fleet\AstMatcher\Core\NodeTypes;
+use Fleet\AstMatcher\Core\NodeMatcher;
+use PhpParser\Node\Stmt\Catch_;
 
-class CatchMatcher extends Matcher
+class CatchMatcher extends NodeMatcher
 {
-    private $types;
-    private $var;
-    private $body;
+    public function __construct(
+        private readonly ?Matcher $types = null,
+        private readonly ?Matcher $var   = null,
+        private readonly ?Matcher $body  = null,
+    ) {}
 
-    public function __construct($types = null, $var = null, $body = null)
-    {
-        $this->types = $types;
-        $this->var   = $var;
-        $this->body  = $body;
-    }
+    protected function nodeClass(): string { return Catch_::class; }
 
-    public function matchValue($node, $keys = []): bool
+    protected function matchNode($node, array $keys): bool
     {
-        if (!NodeTypes::isNode($node) || !NodeTypes::isCatch($node)) {
-            return false;
-        }
-        // $node->types is Name[] (the caught exception types)
-        if ($this->types !== null && !$this->types->matchValue($node->types, array_merge($keys, ['types']))) {
-            return false;
-        }
-        if ($this->var !== null && !$this->var->matchValue($node->var, array_merge($keys, ['var']))) {
-            return false;
-        }
-        if ($this->body !== null && !$this->body->matchValue($node->stmts, array_merge($keys, ['stmts']))) {
-            return false;
-        }
-        return true;
+        return $this->matchField($this->types, $node->types, $keys, 'types')
+            && $this->matchField($this->var,   $node->var,   $keys, 'var')
+            && $this->matchField($this->body,  $node->stmts, $keys, 'stmts');
     }
 }
