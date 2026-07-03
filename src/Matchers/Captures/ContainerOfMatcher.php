@@ -22,6 +22,11 @@ class ContainerOfMatcher extends CapturedMatcher
         return $this;
     }
 
+    public function match($value, $keys = []): bool
+    {
+        return $this->matchValue($value, $keys);
+    }
+
     public function matchValue($value, $keys = []): bool
     {
         if (is_array($value)) {
