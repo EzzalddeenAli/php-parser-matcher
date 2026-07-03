@@ -131,64 +131,117 @@ class AstTestRunner
         return self::$printer->prettyPrint(is_array($node) ? $node : [$node]);
     }
 
-    public static function run(): void
+    /**
+     * Run all examples in this class.
+     * Returns ['passed', 'failed', 'skipped'] counts.
+     */
+    public static function run(): array
     {
-        $instance = new static();
+        $instance   = new static();
         $reflection = new \ReflectionClass(static::class);
-        $passed = 0;
-        $failed = 0;
+
+        // Collect only methods annotated with #[Example]
+        $methods = array_values(array_filter(
+            $reflection->getMethods(\ReflectionMethod::IS_PUBLIC),
+            fn($m) => !empty($m->getAttributes(Example::class)),
+        ));
+
+        $total   = count($methods);
+        $passed  = 0;
+        $failed  = 0;
         $skipped = 0;
 
-        self::printHeader("Running: " . $reflection->getShortName());
+        self::printHeader($reflection->getShortName(), $total);
 
-        foreach ($reflection->getMethods() as $method) {
-            $attrs = $method->getAttributes(Example::class);
-            if (empty($attrs)) {
-                continue;
-            }
-
-            $attr = $attrs[0]->newInstance();
+        foreach ($methods as $i => $method) {
+            $attr        = $method->getAttributes(Example::class)[0]->newInstance();
             $description = $attr->description ?: $method->getName();
+            $counter     = self::COLOR_BOLD . '[' . ($i + 1) . "/$total]" . self::COLOR_RESET;
 
             if ($attr->skip) {
-                echo self::COLOR_YELLOW . "  ⊘ SKIP: " . self::COLOR_RESET . $description . PHP_EOL;
+                echo self::COLOR_YELLOW . "  ⊘ $counter " . self::COLOR_RESET . $description . PHP_EOL;
                 $skipped++;
                 continue;
             }
 
-            echo self::COLOR_CYAN . self::COLOR_BOLD . "▶ " . self::COLOR_RESET . $description . PHP_EOL;
+            echo self::COLOR_CYAN . self::COLOR_BOLD . "▶ " . self::COLOR_RESET
+                . $counter . ' ' . $description . PHP_EOL;
 
             try {
                 $method->invoke($instance);
                 echo self::COLOR_GREEN . "  ✔ Passed" . self::COLOR_RESET . PHP_EOL;
                 $passed++;
             } catch (InvalidArgumentException $e) {
-                echo self::COLOR_RED . "  ✘ Failed: " . self::COLOR_RESET . $e->getMessage() . PHP_EOL;
+                echo self::COLOR_RED . "  ✘ Assertion failed: " . self::COLOR_RESET . $e->getMessage() . PHP_EOL;
                 $failed++;
             } catch (\Throwable $e) {
-                echo self::COLOR_RED . "  ❗ Error: " . self::COLOR_RESET . $e->getMessage() . PHP_EOL;
+                echo self::COLOR_RED . "  ✘ Error: " . self::COLOR_RESET . $e->getMessage() . PHP_EOL;
                 $failed++;
             }
 
-            echo str_repeat("─", 50) . PHP_EOL;
+            echo str_repeat("─", 55) . PHP_EOL;
         }
 
-        echo PHP_EOL;
-        $total = $passed + $failed + $skipped;
-        echo self::COLOR_BOLD . "Results: " . self::COLOR_RESET;
-        echo self::COLOR_GREEN . "$passed passed" . self::COLOR_RESET . " | ";
-        echo ($failed > 0 ? self::COLOR_RED : '') . "$failed failed" . self::COLOR_RESET;
-        if ($skipped > 0) {
-            echo " | " . self::COLOR_YELLOW . "$skipped skipped" . self::COLOR_RESET;
-        }
-        echo " / $total total" . PHP_EOL;
+        self::printSummary($passed, $failed, $skipped);
+
+        return compact('passed', 'failed', 'skipped');
     }
 
-    protected static function printHeader(string $title): void
+    /**
+     * Run multiple test suite classes and print a combined summary.
+     * Exits with code 1 if any test fails.
+     */
+    public static function runAll(string ...$classes): void
     {
+        $totalPassed  = 0;
+        $totalFailed  = 0;
+        $totalSkipped = 0;
+
+        foreach ($classes as $class) {
+            /** @noinspection PhpUndefinedMethodInspection */
+            $stats         = $class::run();
+            $totalPassed  += $stats['passed'];
+            $totalFailed  += $stats['failed'];
+            $totalSkipped += $stats['skipped'];
+        }
+
+        $total = $totalPassed + $totalFailed + $totalSkipped;
+
         echo PHP_EOL;
-        echo self::COLOR_BOLD . self::COLOR_GREEN . str_repeat("═", 55) . self::COLOR_RESET . PHP_EOL;
-        echo self::COLOR_BOLD . self::COLOR_YELLOW . "  " . $title . self::COLOR_RESET . PHP_EOL;
-        echo self::COLOR_BOLD . self::COLOR_GREEN . str_repeat("═", 55) . self::COLOR_RESET . PHP_EOL . PHP_EOL;
+        echo self::COLOR_BOLD . self::COLOR_GREEN
+            . str_repeat('═', 55) . self::COLOR_RESET . PHP_EOL;
+        echo self::COLOR_BOLD . self::COLOR_YELLOW
+            . "  ALL SUITES — " . count($classes) . " suites, $total tests"
+            . self::COLOR_RESET . PHP_EOL;
+        echo self::COLOR_BOLD . self::COLOR_GREEN
+            . str_repeat('═', 55) . self::COLOR_RESET . PHP_EOL;
+        self::printSummary($totalPassed, $totalFailed, $totalSkipped);
+
+        if ($totalFailed > 0) {
+            exit(1);
+        }
+    }
+
+    protected static function printHeader(string $title, int $count): void
+    {
+        $subtitle = "$count test" . ($count !== 1 ? 's' : '');
+        echo PHP_EOL;
+        echo self::COLOR_BOLD . self::COLOR_GREEN . str_repeat('═', 55) . self::COLOR_RESET . PHP_EOL;
+        echo self::COLOR_BOLD . self::COLOR_YELLOW . "  $title" . self::COLOR_RESET
+            . self::COLOR_CYAN . "  ($subtitle)" . self::COLOR_RESET . PHP_EOL;
+        echo self::COLOR_BOLD . self::COLOR_GREEN . str_repeat('═', 55) . self::COLOR_RESET . PHP_EOL . PHP_EOL;
+    }
+
+    private static function printSummary(int $passed, int $failed, int $skipped): void
+    {
+        $total = $passed + $failed + $skipped;
+        echo PHP_EOL;
+        echo self::COLOR_BOLD . 'Results: ' . self::COLOR_RESET;
+        echo self::COLOR_GREEN . "$passed passed" . self::COLOR_RESET . ' | ';
+        echo ($failed > 0 ? self::COLOR_RED : '') . "$failed failed" . self::COLOR_RESET;
+        if ($skipped > 0) {
+            echo ' | ' . self::COLOR_YELLOW . "$skipped skipped" . self::COLOR_RESET;
+        }
+        echo " / $total total" . PHP_EOL;
     }
 }
