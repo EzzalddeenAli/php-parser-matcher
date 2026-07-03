@@ -2,6 +2,7 @@
 
 namespace Fleet\AstMatcher\Facade;
 
+use Fleet\AstMatcher\Core\Matcher;
 use Fleet\AstMatcher\Matchers\Captures\CapturedMatcher;
 use Fleet\AstMatcher\Matchers\Captures\CapturesCollectorMatcher;
 use Fleet\AstMatcher\Matchers\Captures\ContainerOfMatcher;
@@ -42,9 +43,9 @@ use Fleet\AstMatcher\Matchers\Expressions\Operations\CastMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\Operations\TernaryMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\Operations\UnaryOpMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\ThrowExprMatcher;
-use Fleet\AstMatcher\Matchers\Generic\AnythingMatcher;
 use Fleet\AstMatcher\Matchers\Generic\AnyNodeMatcher;
 use Fleet\AstMatcher\Matchers\Generic\AnyStatementMatcher;
+use Fleet\AstMatcher\Matchers\Generic\AnythingMatcher;
 use Fleet\AstMatcher\Matchers\Generic\OneOfMatcher;
 use Fleet\AstMatcher\Matchers\Generic\OrMatcher;
 use Fleet\AstMatcher\Matchers\Generic\PredicateMatcher;
@@ -53,17 +54,17 @@ use Fleet\AstMatcher\Matchers\Names\VariableMatcher;
 use Fleet\AstMatcher\Matchers\Nodes\ArgMatcher;
 use Fleet\AstMatcher\Matchers\Nodes\ArrayItemMatcher;
 use Fleet\AstMatcher\Matchers\Nodes\AttributeMatcher;
+use Fleet\AstMatcher\Matchers\Nodes\CaseMatcher;
+use Fleet\AstMatcher\Matchers\Nodes\CatchMatcher;
+use Fleet\AstMatcher\Matchers\Nodes\ElseIfMatcher;
+use Fleet\AstMatcher\Matchers\Nodes\ElseMatcher;
+use Fleet\AstMatcher\Matchers\Nodes\FinallyMatcher;
 use Fleet\AstMatcher\Matchers\Nodes\ParamMatcher;
 use Fleet\AstMatcher\Matchers\Nodes\TraitUseMatcher;
 use Fleet\AstMatcher\Matchers\Scalars\AnyNumberMatcher;
 use Fleet\AstMatcher\Matchers\Scalars\AnyStringMatcher;
 use Fleet\AstMatcher\Matchers\Scalars\NumberLiteralMatcher;
 use Fleet\AstMatcher\Matchers\Scalars\StringLiteralMatcher;
-use Fleet\AstMatcher\Matchers\Nodes\CaseMatcher;
-use Fleet\AstMatcher\Matchers\Nodes\CatchMatcher;
-use Fleet\AstMatcher\Matchers\Nodes\ElseIfMatcher;
-use Fleet\AstMatcher\Matchers\Nodes\ElseMatcher;
-use Fleet\AstMatcher\Matchers\Nodes\FinallyMatcher;
 use Fleet\AstMatcher\Matchers\Statements\BreakMatcher;
 use Fleet\AstMatcher\Matchers\Statements\ContinueMatcher;
 use Fleet\AstMatcher\Matchers\Statements\DoWhileMatcher;
@@ -77,9 +78,15 @@ use Fleet\AstMatcher\Matchers\Statements\SwitchMatcher;
 use Fleet\AstMatcher\Matchers\Statements\TryCatchMatcher;
 use Fleet\AstMatcher\Matchers\Statements\WhileMatcher;
 
+/**
+ * Static facade for building AST matchers.
+ *
+ * All parameters are optional — null means "wildcard" (matches anything).
+ * Reserved-word methods (if, else, for, …) are valid PHP class method names.
+ */
 class Ast
 {
-    // ─── Generic ────────────────────────────────────────────────────────────
+    // ─── Generic ─────────────────────────────────────────────────────────────
 
     public static function any(): AnythingMatcher
     {
@@ -96,9 +103,9 @@ class Ast
         return new AnyStatementMatcher();
     }
 
-    public static function or(...$matchersOrValues): OrMatcher
+    public static function or(mixed ...$matchers): OrMatcher
     {
-        return new OrMatcher(...$matchersOrValues);
+        return new OrMatcher(...$matchers);
     }
 
     public static function oneOf(?AnythingMatcher $matcher = null): OneOfMatcher
@@ -113,13 +120,14 @@ class Ast
 
     // ─── Scalars ─────────────────────────────────────────────────────────────
 
-    public static function stringLiteral(?string $value = null): StringLiteralMatcher
+    /** @param Matcher|string|null $value */
+    public static function stringLiteral(mixed $value = null): StringLiteralMatcher
     {
         return new StringLiteralMatcher($value);
     }
 
     /** Alias for stringLiteral() */
-    public static function string(?string $value = null): StringLiteralMatcher
+    public static function string(mixed $value = null): StringLiteralMatcher
     {
         return new StringLiteralMatcher($value);
     }
@@ -147,170 +155,181 @@ class Ast
 
     // ─── Names ───────────────────────────────────────────────────────────────
 
-    public static function identifier(?string $name = null): IdentifierMatcher
+    /** @param Matcher|string|null $name */
+    public static function identifier(mixed $name = null): IdentifierMatcher
     {
         return new IdentifierMatcher($name);
     }
 
     /** Alias for identifier() */
-    public static function name(?string $name = null): IdentifierMatcher
+    public static function name(mixed $name = null): IdentifierMatcher
     {
         return new IdentifierMatcher($name);
     }
 
-    public static function variable(?string $name = null): VariableMatcher
+    /** @param Matcher|string|null $name */
+    public static function variable(mixed $name = null): VariableMatcher
     {
         return new VariableMatcher($name);
     }
 
     /** Alias for variable() */
-    public static function var(?string $name = null): VariableMatcher
+    public static function var(mixed $name = null): VariableMatcher
     {
         return new VariableMatcher($name);
     }
 
     // ─── Calls ───────────────────────────────────────────────────────────────
 
-    public static function callExpression($callee = null, $args = null): CallExpressionMatcher
+    /** @param array|Matcher|null $args */
+    public static function callExpression(?Matcher $callee = null, mixed $args = null): CallExpressionMatcher
     {
         return new CallExpressionMatcher($callee, $args);
     }
 
     /** Alias for callExpression() */
-    public static function call($callee = null, $args = null): CallExpressionMatcher
+    public static function call(?Matcher $callee = null, mixed $args = null): CallExpressionMatcher
     {
         return new CallExpressionMatcher($callee, $args);
     }
 
-    public static function methodCall($object = null, $property = null, $args = null): MethodCallMatcher
+    /** @param array|Matcher|null $args */
+    public static function methodCall(?Matcher $object = null, ?Matcher $name = null, mixed $args = null): MethodCallMatcher
     {
-        return new MethodCallMatcher($object, $property, $args);
+        return new MethodCallMatcher($object, $name, $args);
     }
 
-    public static function staticCall($class = null, $name = null, $args = null): StaticCallMatcher
+    /** @param array|Matcher|null $args */
+    public static function staticCall(?Matcher $class = null, ?Matcher $name = null, mixed $args = null): StaticCallMatcher
     {
         return new StaticCallMatcher($class, $name, $args);
     }
 
-    public static function nullsafeCall($object = null, $name = null, $args = null): NullsafeMethodCallMatcher
+    /** @param array|Matcher|null $args */
+    public static function nullsafeCall(?Matcher $object = null, ?Matcher $name = null, mixed $args = null): NullsafeMethodCallMatcher
     {
         return new NullsafeMethodCallMatcher($object, $name, $args);
     }
 
     // ─── Access ──────────────────────────────────────────────────────────────
 
-    public static function propertyFetch($object = null, $property = null): PropertyFetchMatcher
+    public static function propertyFetch(?Matcher $object = null, ?Matcher $property = null): PropertyFetchMatcher
     {
         return new PropertyFetchMatcher($object, $property);
     }
 
     /** Alias for propertyFetch() */
-    public static function memberExpression($object = null, $property = null): PropertyFetchMatcher
+    public static function memberExpression(?Matcher $object = null, ?Matcher $property = null): PropertyFetchMatcher
     {
         return new PropertyFetchMatcher($object, $property);
     }
 
-    public static function nullsafeProp($object = null, $property = null): NullsafePropertyFetchMatcher
+    public static function nullsafeProp(?Matcher $object = null, ?Matcher $property = null): NullsafePropertyFetchMatcher
     {
         return new NullsafePropertyFetchMatcher($object, $property);
     }
 
-    public static function classConstFetch($class = null, $name = null): ClassConstFetchMatcher
+    public static function classConstFetch(?Matcher $class = null, ?Matcher $name = null): ClassConstFetchMatcher
     {
         return new ClassConstFetchMatcher($class, $name);
     }
 
-    public static function constFetch($name = null): ConstFetchMatcher
+    /** @param Matcher|string|null $name */
+    public static function constFetch(mixed $name = null): ConstFetchMatcher
     {
         return new ConstFetchMatcher($name);
     }
 
-    public static function true_(): ConstFetchMatcher
+    public static function true(): ConstFetchMatcher
     {
         return new ConstFetchMatcher('true');
     }
 
-    public static function false_(): ConstFetchMatcher
+    public static function false(): ConstFetchMatcher
     {
         return new ConstFetchMatcher('false');
     }
 
-    public static function null_(): ConstFetchMatcher
+    public static function null(): ConstFetchMatcher
     {
         return new ConstFetchMatcher('null');
     }
 
-    public static function arrayAccess($var = null, $dim = null): ArrayDimFetchMatcher
+    public static function arrayAccess(?Matcher $var = null, ?Matcher $dim = null): ArrayDimFetchMatcher
     {
         return new ArrayDimFetchMatcher($var, $dim);
     }
 
     /** Alias for arrayAccess() */
-    public static function arrayDimFetch($var = null, $dim = null): ArrayDimFetchMatcher
+    public static function arrayDimFetch(?Matcher $var = null, ?Matcher $dim = null): ArrayDimFetchMatcher
     {
         return new ArrayDimFetchMatcher($var, $dim);
     }
 
     // ─── Assignment ──────────────────────────────────────────────────────────
 
-    public static function assign($var = null, $expr = null): AssignMatcher
+    public static function assign(?Matcher $var = null, ?Matcher $expr = null): AssignMatcher
     {
         return new AssignMatcher($var, $expr);
     }
 
-    public static function assignOp(?string $operator = null, $var = null, $expr = null): AssignOpMatcher
+    public static function assignOp(?string $operator = null, ?Matcher $var = null, ?Matcher $expr = null): AssignOpMatcher
     {
         return new AssignOpMatcher($operator, $var, $expr);
     }
 
     // ─── Operations ──────────────────────────────────────────────────────────
 
-    public static function binaryOp($operator = null, $left = null, $right = null): BinaryOpMatcher
+    /** @param Matcher|string|null $operator */
+    public static function binaryOp(mixed $operator = null, ?Matcher $left = null, ?Matcher $right = null): BinaryOpMatcher
     {
         return new BinaryOpMatcher($operator, $left, $right);
     }
 
     /** Alias for binaryOp() */
-    public static function logicalExpression($operator = null, $left = null, $right = null): BinaryOpMatcher
+    public static function logicalExpression(mixed $operator = null, ?Matcher $left = null, ?Matcher $right = null): BinaryOpMatcher
     {
         return new BinaryOpMatcher($operator, $left, $right);
     }
 
-    public static function ternary($cond = null, $if = null, $else = null): TernaryMatcher
+    public static function ternary(?Matcher $cond = null, ?Matcher $if = null, ?Matcher $else = null): TernaryMatcher
     {
         return new TernaryMatcher($cond, $if, $else);
     }
 
-    public static function cast(?string $type = null, $expr = null): CastMatcher
+    public static function cast(?string $type = null, ?Matcher $expr = null): CastMatcher
     {
         return new CastMatcher($type, $expr);
     }
 
-    public static function unaryOp(?string $operator = null, $expr = null): UnaryOpMatcher
+    public static function unaryOp(?string $operator = null, ?Matcher $expr = null): UnaryOpMatcher
     {
         return new UnaryOpMatcher($operator, $expr);
     }
 
     // ─── Objects ─────────────────────────────────────────────────────────────
 
-    public static function new_($class = null, $args = null): NewMatcher
+    /** @param array|Matcher|null $args */
+    public static function new(?Matcher $class = null, mixed $args = null): NewMatcher
     {
         return new NewMatcher($class, $args);
     }
 
-    public static function instanceof_($expr = null, $class = null): InstanceofMatcher
+    public static function instanceof(?Matcher $expr = null, ?Matcher $class = null): InstanceofMatcher
     {
         return new InstanceofMatcher($expr, $class);
     }
 
     // ─── Functions ───────────────────────────────────────────────────────────
 
-    public static function closure($params = null, $body = null, $static = null): ClosureMatcher
+    /** @param array|Matcher|null $params   @param array|Matcher|null $body */
+    public static function closure(mixed $params = null, mixed $body = null, ?bool $static = null): ClosureMatcher
     {
         return new ClosureMatcher($params, $body, $static);
     }
 
-    public static function arrowFn($params = null, $expr = null, $static = null): ArrowFunctionMatcher
+    /** @param array|Matcher|null $params */
+    public static function arrowFn(mixed $params = null, ?Matcher $expr = null, ?bool $static = null): ArrowFunctionMatcher
     {
         return new ArrowFunctionMatcher($params, $expr, $static);
     }
@@ -323,182 +342,189 @@ class Ast
     }
 
     /** Alias for arrayExpression() */
-    public static function array_(?array $elements = null): ArrayExpressionMatcher
+    public static function array(?array $elements = null): ArrayExpressionMatcher
     {
         return new ArrayExpressionMatcher($elements);
     }
 
-    public static function throw_($expr = null): ThrowExprMatcher
+    public static function throw(?Matcher $expr = null): ThrowExprMatcher
     {
         return new ThrowExprMatcher($expr);
     }
 
-    public static function matchExpr($subject = null, $arms = null): MatchExprMatcher
+    public static function matchExpr(?Matcher $subject = null, ?Matcher $arms = null): MatchExprMatcher
     {
         return new MatchExprMatcher($subject, $arms);
     }
 
     // ─── Statements ──────────────────────────────────────────────────────────
 
-    public static function expressionStatement($expr = null): ExpressionStatementMatcher
+    public static function expressionStatement(?Matcher $expr = null): ExpressionStatementMatcher
     {
         return new ExpressionStatementMatcher($expr);
     }
 
     /** Alias for expressionStatement() */
-    public static function statement($expr = null): ExpressionStatementMatcher
+    public static function statement(?Matcher $expr = null): ExpressionStatementMatcher
     {
         return new ExpressionStatementMatcher($expr);
     }
 
-    public static function return_($argument = null): ReturnStatementMatcher
+    public static function return(?Matcher $argument = null): ReturnStatementMatcher
     {
         return new ReturnStatementMatcher($argument);
     }
 
-    /** Alias for return_() */
-    public static function returnStatement($argument = null): ReturnStatementMatcher
+    /** Alias for return() */
+    public static function returnStatement(?Matcher $argument = null): ReturnStatementMatcher
     {
         return new ReturnStatementMatcher($argument);
     }
 
     // ─── Declarations ────────────────────────────────────────────────────────
 
-    public static function functionDeclaration($name = null, $params = null, $body = null): FunctionDeclarationMatcher
+    /** @param array|Matcher|null $params   @param array|Matcher|null $body */
+    public static function functionDeclaration(?Matcher $name = null, mixed $params = null, mixed $body = null): FunctionDeclarationMatcher
     {
         return new FunctionDeclarationMatcher($name, $params, $body);
     }
 
-    public static function classDeclaration($name = null, $extends = null, $body = null): ClassDeclarationMatcher
+    /** @param array|Matcher|null $body */
+    public static function classDeclaration(?Matcher $name = null, ?Matcher $extends = null, mixed $body = null): ClassDeclarationMatcher
     {
         return new ClassDeclarationMatcher($name, $extends, $body);
     }
 
-    public static function classMethod($name = null, $params = null, $body = null, $static = null): ClassMethodMatcher
+    /** @param array|Matcher|null $params   @param array|Matcher|null $body */
+    public static function classMethod(?Matcher $name = null, mixed $params = null, mixed $body = null, ?bool $static = null): ClassMethodMatcher
     {
         return new ClassMethodMatcher($name, $params, $body, $static);
     }
 
-    public static function classProperty($name = null, $default = null, $static = null): ClassPropertyMatcher
+    public static function classProperty(?Matcher $name = null, ?Matcher $default = null, ?bool $static = null): ClassPropertyMatcher
     {
         return new ClassPropertyMatcher($name, $default, $static);
     }
 
-    public static function trait_($name = null, $body = null): TraitMatcher
+    /** @param array|Matcher|null $body */
+    public static function trait(?Matcher $name = null, mixed $body = null): TraitMatcher
     {
         return new TraitMatcher($name, $body);
     }
 
-    public static function interface_($name = null, $extends = null, $body = null): InterfaceMatcher
+    /** @param array|Matcher|null $body */
+    public static function interface(?Matcher $name = null, ?Matcher $extends = null, mixed $body = null): InterfaceMatcher
     {
         return new InterfaceMatcher($name, $extends, $body);
     }
 
-    public static function enum_($name = null, $scalarType = null, $body = null): EnumMatcher
+    /** @param array|Matcher|null $body */
+    public static function enum(?Matcher $name = null, ?Matcher $scalarType = null, mixed $body = null): EnumMatcher
     {
         return new EnumMatcher($name, $scalarType, $body);
     }
 
-    public static function enumCase($name = null, $expr = null): EnumCaseMatcher
+    public static function enumCase(?Matcher $name = null, ?Matcher $expr = null): EnumCaseMatcher
     {
         return new EnumCaseMatcher($name, $expr);
     }
 
-    public static function namespace_($name = null, $stmts = null): NamespaceMatcher
+    public static function namespace(?Matcher $name = null, ?Matcher $stmts = null): NamespaceMatcher
     {
         return new NamespaceMatcher($name, $stmts);
     }
 
-    public static function use_($name = null, $alias = null): UseStatementMatcher
+    public static function use(?Matcher $name = null, ?Matcher $alias = null): UseStatementMatcher
     {
         return new UseStatementMatcher($name, $alias);
     }
 
     // ─── Control Flow ────────────────────────────────────────────────────────
 
-    public static function if_($cond = null, $then = null, $elseifs = null, $else = null): IfMatcher
+    public static function if(?Matcher $cond = null, ?Matcher $then = null, ?Matcher $elseifs = null, ?Matcher $else = null): IfMatcher
     {
         return new IfMatcher($cond, $then, $elseifs, $else);
     }
 
-    public static function elseIf_($cond = null, $body = null): ElseIfMatcher
+    public static function elseIf(?Matcher $cond = null, ?Matcher $body = null): ElseIfMatcher
     {
         return new ElseIfMatcher($cond, $body);
     }
 
-    public static function else_($body = null): ElseMatcher
+    public static function else(?Matcher $body = null): ElseMatcher
     {
         return new ElseMatcher($body);
     }
 
-    public static function foreach_($expr = null, $valueVar = null, $keyVar = null, $body = null): ForeachMatcher
+    public static function foreach(?Matcher $expr = null, ?Matcher $valueVar = null, ?Matcher $keyVar = null, ?Matcher $body = null): ForeachMatcher
     {
         return new ForeachMatcher($expr, $valueVar, $keyVar, $body);
     }
 
-    public static function while_($cond = null, $body = null): WhileMatcher
+    public static function while(?Matcher $cond = null, ?Matcher $body = null): WhileMatcher
     {
         return new WhileMatcher($cond, $body);
     }
 
-    public static function doWhile($body = null, $cond = null): DoWhileMatcher
+    public static function doWhile(?Matcher $body = null, ?Matcher $cond = null): DoWhileMatcher
     {
         return new DoWhileMatcher($body, $cond);
     }
 
-    public static function for_($init = null, $cond = null, $loop = null, $body = null): ForMatcher
+    public static function for(?Matcher $init = null, ?Matcher $cond = null, ?Matcher $loop = null, ?Matcher $body = null): ForMatcher
     {
         return new ForMatcher($init, $cond, $loop, $body);
     }
 
-    public static function tryCatch($body = null, $catches = null, $finally = null): TryCatchMatcher
+    public static function tryCatch(?Matcher $body = null, ?Matcher $catches = null, ?Matcher $finally = null): TryCatchMatcher
     {
         return new TryCatchMatcher($body, $catches, $finally);
     }
 
-    public static function catch_($types = null, $var = null, $body = null): CatchMatcher
+    public static function catch(?Matcher $types = null, ?Matcher $var = null, ?Matcher $body = null): CatchMatcher
     {
         return new CatchMatcher($types, $var, $body);
     }
 
-    public static function finally_($body = null): FinallyMatcher
+    public static function finally(?Matcher $body = null): FinallyMatcher
     {
         return new FinallyMatcher($body);
     }
 
-    public static function switch_($cond = null, $cases = null): SwitchMatcher
+    public static function switch(?Matcher $cond = null, ?Matcher $cases = null): SwitchMatcher
     {
         return new SwitchMatcher($cond, $cases);
     }
 
-    public static function case_($cond = null, $body = null): CaseMatcher
+    public static function case(?Matcher $cond = null, ?Matcher $body = null): CaseMatcher
     {
         return new CaseMatcher($cond, $body);
     }
 
-    public static function echo_($exprs = null): EchoMatcher
+    public static function echo(?Matcher $exprs = null): EchoMatcher
     {
         return new EchoMatcher($exprs);
     }
 
-    public static function break_($num = null): BreakMatcher
+    public static function break(?Matcher $num = null): BreakMatcher
     {
         return new BreakMatcher($num);
     }
 
-    public static function continue_($num = null): ContinueMatcher
+    public static function continue(?Matcher $num = null): ContinueMatcher
     {
         return new ContinueMatcher($num);
     }
 
     // ─── Nodes ───────────────────────────────────────────────────────────────
 
-    public static function arg($value = null, $name = null): ArgMatcher
+    public static function arg(?Matcher $value = null, ?Matcher $name = null): ArgMatcher
     {
         return new ArgMatcher($value, $name);
     }
 
-    public static function param($name = null, $type = null): ParamMatcher
+    /** Accepts string shorthand: param('userId', 'int') */
+    public static function param(Matcher|string|null $name = null, Matcher|string|null $type = null): ParamMatcher
     {
         if (is_string($name)) {
             $name = new VariableMatcher($name);
@@ -509,17 +535,18 @@ class Ast
         return new ParamMatcher($name, $type);
     }
 
-    public static function arrayItem($value = null, $key = null): ArrayItemMatcher
+    public static function arrayItem(?Matcher $value = null, ?Matcher $key = null): ArrayItemMatcher
     {
         return new ArrayItemMatcher($value, $key);
     }
 
-    public static function attribute($name = null, $args = null): AttributeMatcher
+    /** @param array|Matcher|null $args */
+    public static function attribute(?Matcher $name = null, mixed $args = null): AttributeMatcher
     {
         return new AttributeMatcher($name, $args);
     }
 
-    public static function traitUse($traits = null): TraitUseMatcher
+    public static function traitUse(?Matcher $traits = null): TraitUseMatcher
     {
         return new TraitUseMatcher($traits);
     }
@@ -531,13 +558,13 @@ class Ast
         return new AnyListMatcher($matchers);
     }
 
-    /** Alias for anyList() — matches a block body */
+    /** Alias for anyList() */
     public static function body(mixed ...$matchers): AnyListMatcher
     {
         return new AnyListMatcher($matchers);
     }
 
-    /** Alias for anyList() — matches a statement block (same as anyList/body) */
+    /** Alias for anyList() */
     public static function blockStatement(mixed ...$matchers): AnyListMatcher
     {
         if (count($matchers) === 1 && is_array($matchers[0])) {
@@ -551,28 +578,28 @@ class Ast
         return new TupleOfMatcher(...$matchers);
     }
 
-    public static function arrayOf($elementMatcher): ArrayOfMatcher
+    public static function arrayOf(Matcher $elementMatcher): ArrayOfMatcher
     {
         return new ArrayOfMatcher($elementMatcher);
     }
 
-    public static function slice(int|array $options, $matcher = null): SliceMatcher
+    public static function slice(int|array $options, ?Matcher $matcher = null): SliceMatcher
     {
         if (is_int($options)) {
             return new SliceMatcher($options, $options, $matcher ?? new AnythingMatcher());
         }
         $min = $options['min'] ?? 0;
         $max = $options['max'] ?? PHP_INT_MAX;
-        $m = $options['matcher'] ?? $matcher ?? new AnythingMatcher();
+        $m   = $options['matcher'] ?? $matcher ?? new AnythingMatcher();
         return new SliceMatcher($min, $max, $m);
     }
 
-    public static function zeroOrMore($matcher = null): SliceMatcher
+    public static function zeroOrMore(?Matcher $matcher = null): SliceMatcher
     {
         return new SliceMatcher(0, PHP_INT_MAX, $matcher ?? new AnythingMatcher());
     }
 
-    public static function oneOrMore($matcher = null): SliceMatcher
+    public static function oneOrMore(?Matcher $matcher = null): SliceMatcher
     {
         return new SliceMatcher(1, PHP_INT_MAX, $matcher ?? new AnythingMatcher());
     }
@@ -584,17 +611,17 @@ class Ast
 
     // ─── Captures ────────────────────────────────────────────────────────────
 
-    public static function capture($matcher = null): CapturedMatcher
+    public static function capture(?Matcher $matcher = null): CapturedMatcher
     {
         return new CapturedMatcher($matcher);
     }
 
-    public static function captureCollector($matcher = null): CapturesCollectorMatcher
+    public static function captureCollector(?Matcher $matcher = null): CapturesCollectorMatcher
     {
         return new CapturesCollectorMatcher($matcher);
     }
 
-    public static function containerOf($containedMatcher): ContainerOfMatcher
+    public static function containerOf(Matcher $containedMatcher): ContainerOfMatcher
     {
         return new ContainerOfMatcher($containedMatcher);
     }
