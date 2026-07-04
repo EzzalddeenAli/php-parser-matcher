@@ -4,7 +4,7 @@ namespace Fleet\AstMatcher\Facade;
 
 use Fleet\AstMatcher\Core\Matcher;
 use Fleet\AstMatcher\Matchers\Captures\CapturedMatcher;
-use Fleet\AstMatcher\Matchers\Captures\CapturesCollectorMatcher;
+use Fleet\AstMatcher\Matchers\Captures\CaptureGroup;
 use Fleet\AstMatcher\Matchers\Captures\ContainerOfMatcher;
 use Fleet\AstMatcher\Matchers\Captures\FromCaptureMatcher;
 use Fleet\AstMatcher\Matchers\Collections\AnyListMatcher;
@@ -30,6 +30,7 @@ use Fleet\AstMatcher\Matchers\Expressions\ArrayExpressionMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\Assignment\AssignMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\Assignment\AssignOpMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\Calls\CallExpressionMatcher;
+use Fleet\AstMatcher\Matchers\Expressions\Calls\ChainCallMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\Calls\MethodCallMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\Calls\NullsafeMethodCallMatcher;
 use Fleet\AstMatcher\Matchers\Expressions\Calls\StaticCallMatcher;
@@ -167,6 +168,13 @@ class Ast
         return new IdentifierMatcher($name);
     }
 
+    /** Alias for identifier() */
+    public static function oneNameOf(array $names = null): OrMatcher
+    {
+        $matchers=array_map(fn($name) => new IdentifierMatcher($name),$names);
+        return new OrMatcher(...$matchers);
+    }
+
     /** @param Matcher|string|null $name */
     public static function variable(mixed $name = null): VariableMatcher
     {
@@ -209,6 +217,33 @@ class Ast
     public static function nullsafeCall(?Matcher $object = null, ?Matcher $name = null, mixed $args = null): NullsafeMethodCallMatcher
     {
         return new NullsafeMethodCallMatcher($object, $name, $args);
+    }
+
+    /**
+     * Match a method/static/function call chain as a whole unit.
+     *
+     * Unlike staticCall() / methodCall() (which match a single node),
+     * chain() flattens the full chain and lets you assert conditions across
+     * the root AND individual chain calls in one fluent expression.
+     *
+     * All conditions are ANDed together.
+     *
+     *   Ast::chain()
+     *       ->rootClass('Text')        // StaticCall root class
+     *       ->rootMethod('make')       // root method name
+     *       ->hasCall('sortable')      // chain must contain ->sortable()
+     *       ->lacksCall('hideFromIndex')
+     *       ->callArgs('rules', [Ast::arg(Ast::string('required'))])
+     */
+    public static function chain(): ChainCallMatcher
+    {
+        return new ChainCallMatcher();
+    }
+
+    /** Alias for chain() */
+    public static function chainCall(): ChainCallMatcher
+    {
+        return new ChainCallMatcher();
     }
 
     // ─── Access ──────────────────────────────────────────────────────────────
@@ -336,13 +371,14 @@ class Ast
 
     // ─── Expressions ─────────────────────────────────────────────────────────
 
-    public static function arrayExpression(?array $elements = null): ArrayExpressionMatcher
+    /** @param array|Matcher|null $elements array of per-item matchers, or a single Matcher that receives element values directly */
+    public static function arrayExpression(array|Matcher|null $elements = null): ArrayExpressionMatcher
     {
         return new ArrayExpressionMatcher($elements);
     }
 
     /** Alias for arrayExpression() */
-    public static function array(?array $elements = null): ArrayExpressionMatcher
+    public static function array(array|Matcher|null $elements = null): ArrayExpressionMatcher
     {
         return new ArrayExpressionMatcher($elements);
     }
@@ -429,7 +465,7 @@ class Ast
         return new EnumCaseMatcher($name, $expr);
     }
 
-    public static function namespace(?Matcher $name = null, ?Matcher $stmts = null): NamespaceMatcher
+    public static function namespace(?Matcher $name = null, array|Matcher|null $stmts = null): NamespaceMatcher
     {
         return new NamespaceMatcher($name, $stmts);
     }
@@ -611,14 +647,84 @@ class Ast
 
     // ─── Captures ────────────────────────────────────────────────────────────
 
+    /**
+     * Capture the matched node for later reading.
+     *
+     *   $cap = Ast::capture(Ast::string());
+     *   if ($m->match($node)) { $value = $cap->first(); }
+     *
+     * For multiple named captures in one pattern use Ast::captures() instead.
+     */
     public static function capture(?Matcher $matcher = null): CapturedMatcher
     {
         return new CapturedMatcher($matcher);
     }
 
-    public static function captureCollector(?Matcher $matcher = null): CapturesCollectorMatcher
+    /**
+     * Named-capture bag — create once, embed slots by name, read all results
+     * from a single object after the match.
+     *
+     *   $caps = Ast::captures();
+     *   $m = Ast::callExpression(
+     *       $caps->capture('fn',  Ast::name()),
+     *       Ast::anyList(Ast::arg($caps->capture('first', Ast::string())), Ast::zeroOrMore())
+     *   );
+     *   if ($m->match($node)) {
+     *       $fn    = $caps->get('fn');
+     *       $first = $caps->get('first');
+     *   }
+     */
+    public static function captures(): CaptureGroup
     {
-        return new CapturesCollectorMatcher($matcher);
+        return new CaptureGroup();
+    }
+
+    /**
+     * The process-wide default CaptureGroup.
+     *
+     * Populated automatically by $matcher->capture('name') calls that do not
+     * specify an explicit group.  Reset it with Ast::resetCaptures() — or use
+     * Ast::match() which resets it for you — before each new independent match.
+     *
+     *   $m = Ast::callExpression(Ast::name()->capture('fn'), ...);
+     *   Ast::match($m, $node);
+     *   Ast::globalCaptures()->get('fn');   // Name node
+     */
+    public static function globalCaptures(): CaptureGroup
+    {
+        return CaptureGroup::global();
+    }
+
+    /**
+     * Clear captured data in the global group so it is ready for the next match.
+     * Slot registrations are kept — the same matcher tree can be reused.
+     *
+     * Usually you do not need to call this directly; use Ast::match() instead.
+     */
+    public static function resetCaptures(): void
+    {
+        CaptureGroup::resetGlobal();
+    }
+
+    /**
+     * Reset global captures, run the match, and return the result.
+     *
+     * The idiomatic way to run a match when using inline ->capture('name') slots:
+     *
+     *   $m = Ast::callExpression(
+     *       Ast::name()->capture('fn'),
+     *       Ast::anyList(Ast::arg(Ast::string()->capture('arg')), Ast::zeroOrMore())
+     *   );
+     *
+     *   if (Ast::match($m, $node)) {
+     *       $fnName = Ast::globalCaptures()->get('fn');
+     *       $arg    = Ast::globalCaptures()->get('arg');
+     *   }
+     */
+    public static function match(Matcher $matcher, mixed $node): bool
+    {
+        CaptureGroup::resetGlobal();
+        return $matcher->match($node);
     }
 
     public static function containerOf(Matcher $containedMatcher): ContainerOfMatcher

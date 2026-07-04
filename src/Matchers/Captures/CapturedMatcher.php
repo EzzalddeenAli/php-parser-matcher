@@ -5,14 +5,37 @@ namespace Fleet\AstMatcher\Matchers\Captures;
 use Fleet\AstMatcher\Core\Matcher;
 use Fleet\AstMatcher\Matchers\Generic\AnythingMatcher;
 
+/**
+ * Wraps any matcher and records every node it matched.
+ *
+ * Captures accumulate until reset() is called — intentionally, so a single
+ * match() call can collect multiple nodes (e.g. inside anyList / zeroOrMore).
+ * Call reset() before reusing the same instance for a new, independent match.
+ *
+ * Usage:
+ *
+ *   $cap = Ast::capture(Ast::string());
+ *   $m   = Ast::callExpression(Ast::name('route'), Ast::anyList(Ast::arg($cap)));
+ *
+ *   if ($m->match($node)) {
+ *       $routeName = $cap->first();   // Scalar\String_ node
+ *   }
+ *
+ * Multiple captures inside the same call:
+ *
+ *   $caps = Ast::captures();
+ *   $m = Ast::callExpression(
+ *       $caps->capture('fn',  Ast::name()),
+ *       Ast::anyList(Ast::arg($caps->capture('first', Ast::string())), Ast::zeroOrMore())
+ *   );
+ *   if ($m->match($node)) {
+ *       $fnName   = $caps->get('fn');
+ *       $firstArg = $caps->get('first');
+ *   }
+ */
 class CapturedMatcher extends Matcher
 {
-    public Matcher $matcher;
-    public mixed $current = null;
-    public ?array $currentKeys = null;
-    public bool $multiple = false;
-
-    private array $requiredCaptures = [];
+    private Matcher $matcher;
     private array $captures = [];
 
     public function __construct(?Matcher $matcher = null)
@@ -20,95 +43,79 @@ class CapturedMatcher extends Matcher
         $this->matcher = $matcher ?? new AnythingMatcher();
     }
 
-    public function multiple(): static
-    {
-        $this->multiple = true;
-        return $this;
-    }
-
-    public function required(array $captures): static
-    {
-        $this->requiredCaptures = $captures;
-        return $this;
-    }
-
-    public function reset(): static
-    {
-        $this->captures = [];
-        $this->current = null;
-        $this->currentKeys = null;
-        foreach ($this->requiredCaptures as $capture) {
-            $capture->reset();
-        }
-        return $this;
-    }
-
-    public function getCurrent(): mixed
-    {
-        return $this->current;
-    }
-
-    public function getCurrentKeys(): ?array
-    {
-        return $this->currentKeys;
-    }
-
-    public function getCaptures(): array
-    {
-        return $this->captures;
-    }
-
-    public function isMatched(): bool
-    {
-        return $this->current !== null;
-    }
-
-    public function match($value, $keys = []): bool
-    {
-        return $this->isMatchValue($value, $keys);
-    }
-
     public function matchValue($value, $keys = []): bool
     {
-        $this->resetRequiredCaptures();
-        return $this->isMatchValue($value, $keys);
-    }
-
-    public function isMatchValue($value, $keys = []): bool
-    {
-        if ($this->matcher->matchValue($value, $keys) && $this->allRequiredCapturesMet()) {
-            $this->capture($value, $keys);
+        if ($this->matcher->matchValue($value, $keys)) {
+            $this->captures[] = $value;
             return true;
         }
         return false;
     }
 
-    private function allRequiredCapturesMet(): bool
+    // ─── Result API ────────────────────────────────────────────────────────────
+
+    /** First captured node, or null if nothing matched yet. */
+    public function first(): mixed
     {
-        foreach ($this->requiredCaptures as $capture) {
-            if (!$capture->isMatched()) {
-                return false;
-            }
-        }
-        return true;
+        return $this->captures[0] ?? null;
     }
 
-    private function resetRequiredCaptures(): void
+    /** Last captured node, or null if nothing matched yet. */
+    public function last(): mixed
     {
-        foreach ($this->requiredCaptures as $capture) {
-            $capture->reset();
-        }
+        return !empty($this->captures) ? end($this->captures) : null;
     }
 
-    public function capture(mixed $value, array $keys): void
+    /** All captured nodes in match order. */
+    public function all(): array
     {
-        $this->current = $value;
-        $this->currentKeys = $keys;
+        return $this->captures;
+    }
+
+    /** Number of nodes captured since the last reset(). */
+    public function count(): int
+    {
+        return count($this->captures);
+    }
+
+    /** True if at least one node was captured. */
+    public function matched(): bool
+    {
+        return !empty($this->captures);
+    }
+
+    /** Clear captured results to reuse this instance for a fresh match. */
+    public function reset(): static
+    {
+        $this->captures = [];
+        return $this;
+    }
+
+    /**
+     * Store an entire array of elements as one capture entry.
+     * Used by SliceCaptureMatcher after a successful AnyListMatcher distribution.
+     * first() will return the array itself; all() returns an array of arrays.
+     */
+    public function captureArray(array $elements): void
+    {
+        $this->captures[] = $elements;
+    }
+
+    // ─── Backward-compat aliases ───────────────────────────────────────────────
+
+    /** @deprecated Use first() */
+    public function getCurrent(): mixed { return $this->first(); }
+
+    /** @deprecated Use all() */
+    public function getCaptures(): array { return $this->all(); }
+
+    /** @deprecated Use matched() */
+    public function isMatched(): bool { return $this->matched(); }
+
+    // ─── Internal hook for subclasses ─────────────────────────────────────────
+
+    protected function addCapture(mixed $value): void
+    {
         $this->captures[] = $value;
-    }
-
-    public function subMatch($value, $keys = []): bool
-    {
-        return $this->isMatchValue($value, $keys);
     }
 }

@@ -154,4 +154,60 @@ class CollectionTests extends AstTestRunner
         $this->assertMatches($m, ['str_replace("a", "b", $s)', 'str_contains($s, "x")']);
         $this->assertNotMatches($m, ['array_map(fn($x) => $x, [])', 'sprintf("%s", $x)']);
     }
+
+    // ─── arrayExpression(Matcher) — element-value mode ───────────────────────
+    //
+    // When arrayExpression() receives a single Matcher (not an array),
+    // it passes element VALUES directly — stripping the ArrayItem wrapper.
+    // This lets anyList / zeroOrMore / oneOrMore / arrayOf work naturally
+    // against the actual expressions inside the array.
+
+    #[Example('arrayExpression(arrayOf) — every element value satisfies a matcher')]
+    public function testArrayExpressionArrayOf(): void
+    {
+        $m = Ast::arrayExpression(Ast::arrayOf(Ast::string()));
+        $this->assertMatches($m, ["['a', 'b', 'c']", "['x']", '[]']);
+        $this->assertNotMatches($m, ["['a', 42]", "['a', true]"]);
+    }
+
+    #[Example('arrayExpression(anyList) — segmented: zero+ static calls then one+ strings')]
+    public function testArrayExpressionSegments(): void
+    {
+        $m = Ast::arrayExpression(
+            Ast::anyList(
+                Ast::zeroOrMore(Ast::staticCall()),
+                Ast::oneOrMore(Ast::string()),
+            )
+        );
+        $this->assertMatches($m, [
+            "['label']",
+            "[DB::table('users'), 'label']",
+            "[DB::table('u'), Cache::get('k'), 'x']",
+        ]);
+        $this->assertNotMatches($m, [
+            '[]',
+            "[DB::table('users')]",
+        ]);
+    }
+
+    #[Example('arrayExpression(anyList) — chain calls mixed with any nodes')]
+    public function testArrayExpressionChainMixed(): void
+    {
+        $m = Ast::arrayExpression(
+            Ast::anyList(
+                Ast::zeroOrMore(Ast::chain()->rootIsStaticCall()->rootMethod('make')),
+                Ast::oneOrMore(Ast::anyNode()),
+            )
+        );
+        $this->assertMatches($m, [
+            "[Text::make('Name', 'name')->sortable(), 42]",
+            "[Text::make('A', 'a'), ID::make('id'), 'extra']",
+            "['just_a_string']",
+            // chain call itself satisfies oneOrMore(anyNode) — anyNode matches everything
+            "[Text::make('A', 'a')]",
+        ]);
+        $this->assertNotMatches($m, [
+            '[]',   // empty — oneOrMore(anyNode) requires at least 1 element
+        ]);
+    }
 }

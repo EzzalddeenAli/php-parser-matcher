@@ -28,16 +28,24 @@ class AnyListMatcher extends Matcher
             $remaining = $array;
             $matched = true;
             $key = 0;
+            // Collect batches per SliceCaptureMatcher — committed only on success.
+            $batches = [];
+
             foreach ($this->matchers as $matcher) {
                 if ($matcher instanceof SliceMatcher) {
                     $count = array_shift($allocations) ?: 0;
+                    $batchElements = [];
                     while ($count-- > 0) {
                         $element = array_shift($remaining);
                         if (!$matcher->matchValue($element, array_merge($keys, [$key]))) {
                             $matched = false;
                             break 2;
                         }
+                        $batchElements[] = $element;
                         $key++;
+                    }
+                    if ($matcher instanceof SliceCaptureMatcher) {
+                        $batches[] = [$matcher, $batchElements];
                     }
                 } else {
                     $element = array_shift($remaining);
@@ -49,6 +57,10 @@ class AnyListMatcher extends Matcher
                 }
             }
             if ($matched && count($remaining) === 0) {
+                // Distribution succeeded — now safe to commit list captures.
+                foreach ($batches as [$sliceCapture, $elements]) {
+                    $sliceCapture->commitBatch($elements);
+                }
                 return true;
             }
         }

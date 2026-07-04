@@ -10,7 +10,7 @@ class NamespaceMatcher extends NodeMatcher
 {
     public function __construct(
         private readonly ?Matcher $name  = null,
-        private readonly ?Matcher $stmts = null,
+        private readonly array|Matcher|null $stmts = null,
     ) {}
 
     protected function nodeClass(): string { return Namespace_::class; }
@@ -18,6 +18,6 @@ class NamespaceMatcher extends NodeMatcher
     protected function matchNode($node, array $keys): bool
     {
         return $this->matchField($this->name,  $node->name,  $keys, 'name')
-            && $this->matchField($this->stmts, $node->stmts, $keys, 'stmts');
+            && $this->matchArrayField($this->stmts, $node->stmts, $keys, 'stmts');
     }
 }

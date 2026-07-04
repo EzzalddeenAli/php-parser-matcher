@@ -1,8 +1,10 @@
 {
     "name": "fleet/ast-matcher",
-    "description": "PHP AST pattern matching library",
+    "description": "Fluent PHP AST pattern matching — composable matchers for codemods, static analysis, and automated refactoring",
+    "keywords": ["php-parser", "ast", "ast-matcher", "pattern-matching", "codemod", "static-analysis", "refactoring", "code-analysis", "linter", "php8"],
     "require": {
-        "nikic/php-parser": "^5.7"
+        "php": "^8.1",
+        "nikic/php-parser": "^5.0"
     },
     "require-dev": {
         "zhamao/logger": "^1.1",

@@ -5,6 +5,15 @@ namespace Fleet\AstMatcher\Matchers\Captures;
 use Fleet\AstMatcher\Core\Matcher;
 use Fleet\AstMatcher\Core\NodeTypes;
 
+/**
+ * Matches any node (or array of nodes) that contains the target matcher
+ * somewhere in its subtree.
+ *
+ * Extends CapturedMatcher so the found node is automatically recorded:
+ *   $m = Ast::containerOf(Ast::callExpression(Ast::name('abort')));
+ *   $m->match($ast);
+ *   $found = $m->first();  // the MethodCall / StaticCall node that matched
+ */
 class ContainerOfMatcher extends CapturedMatcher
 {
     private Matcher $containedMatcher;
@@ -22,11 +31,6 @@ class ContainerOfMatcher extends CapturedMatcher
         return $this;
     }
 
-    public function match($value, $keys = []): bool
-    {
-        return $this->matchValue($value, $keys);
-    }
-
     public function matchValue($value, $keys = []): bool
     {
         if (is_array($value)) {
@@ -40,21 +44,21 @@ class ContainerOfMatcher extends CapturedMatcher
             return false;
         }
         if ($this->containedMatcher->matchValue($value, $keys)) {
-            $this->capture($value, $keys);
+            $this->addCapture($value);
             return true;
         }
         foreach ($value->getSubNodeNames() as $key) {
             $sub = $value->{$key};
             if (is_array($sub)) {
                 foreach ($sub as $i => $element) {
-                    if ($this->checkSubNode($element)) {
+                    if ($this->allowsSubNode($element)) {
                         if ($this->matchValue($element, array_merge($keys, [$key, $i]))) {
                             return true;
                         }
                     }
                 }
             } else {
-                if ($this->checkSubNode($sub)) {
+                if ($this->allowsSubNode($sub)) {
                     if ($this->matchValue($sub, array_merge($keys, [$key]))) {
                         return true;
                     }
@@ -64,10 +68,10 @@ class ContainerOfMatcher extends CapturedMatcher
         return false;
     }
 
-    private function checkSubNode(mixed $node): bool
+    private function allowsSubNode(mixed $node): bool
     {
         if ($this->whenCond !== null) {
-            return $this->whenCond->match($node) || $this->containedMatcher->match($node);
+            return $this->whenCond->matchValue($node) || $this->containedMatcher->matchValue($node);
         }
         return true;
     }

@@ -11,7 +11,7 @@ class ClassMethodMatcher extends NodeMatcher
     public function __construct(
         private readonly ?Matcher $name   = null,
         private readonly mixed    $params = null,
-        private readonly ?Matcher $body   = null,
+        private readonly Matcher|array|null $body   = null,
         private readonly ?bool    $static = null,
     ) {}
 
@@ -24,6 +24,6 @@ class ClassMethodMatcher extends NodeMatcher
         }
         return $this->matchField($this->name, $node->name, $keys, 'name')
             && $this->matchArrayField($this->params, $node->params, $keys, 'params')
-            && $this->matchField($this->body, $node->stmts, $keys, 'stmts');
+            && $this->matchArrayField($this->body, $node->stmts, $keys, 'stmts');
     }
 }

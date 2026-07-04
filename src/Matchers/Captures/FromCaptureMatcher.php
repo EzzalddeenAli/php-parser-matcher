@@ -16,7 +16,9 @@ class FromCaptureMatcher extends Matcher
 
     public function matchValue($value, $keys = []): bool
     {
-        $captured = $this->capturedMatcher->getCurrent();
+        // Use last() — capture accumulates, and within a single match operation
+        // the "current" value for cross-reference is always the most recently stored.
+        $captured = $this->capturedMatcher->last();
         if (NodeTypes::isNode($captured) && NodeTypes::isNode($value)) {
             return self::nodesEquivalent($captured, $value);
         }

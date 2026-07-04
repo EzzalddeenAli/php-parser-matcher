@@ -280,8 +280,14 @@ if (!function_exists('spacer')) {
 if (!function_exists('capture')) {
     function capture($matcher = null) { return Ast::capture($matcher); }
 }
-if (!function_exists('captureCollector')) {
-    function captureCollector($matcher = null) { return Ast::captureCollector($matcher); }
+if (!function_exists('captures')) {
+    function captures() { return Ast::captures(); }
+}
+if (!function_exists('globalCaptures')) {
+    function globalCaptures() { return Ast::globalCaptures(); }
+}
+if (!function_exists('resetCaptures')) {
+    function resetCaptures() { Ast::resetCaptures(); }
 }
 if (!function_exists('containerOf')) {
     function containerOf($containedMatcher) { return Ast::containerOf($containedMatcher); }

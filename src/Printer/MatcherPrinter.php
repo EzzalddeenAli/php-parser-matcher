@@ -36,7 +36,7 @@ class MatcherPrinter
      */
     public function __construct(
         private readonly string $facade = 'Ast',
-        private readonly int    $indent = 4,
+        int    $indent = 4,
     ) {
         $this->prefix = ($facade === 'function') ? '' : $facade . '::';
         $this->pad    = str_repeat(' ', $indent);
@@ -52,8 +52,11 @@ class MatcherPrinter
         static $factory = null;
         $factory ??= new ParserFactory();
         $parser = $factory->createForNewestSupportedVersion();
-
-        $code  = '<?php ' . rtrim(trim($phpCode), ';') . ';';
+        if (!str_starts_with(trim($phpCode), '<?php')) {
+            $code  = '<?php ' . rtrim(trim($phpCode), ';') . ';';
+        } else {
+            $code  = rtrim(trim($phpCode), ';') . ';';
+        }
         $stmts = $parser->parse($code);
         $node  = $stmts[0] ?? null;
 
@@ -329,7 +332,7 @@ class MatcherPrinter
 
             $node instanceof Expr\Match_ =>
                 $this->call('matchExpr', [
-                    $this->convert($node->subject),
+                    $this->convert($node->cond),
                     $this->convertArray($node->arms),
                 ]),
 
