@@ -35,15 +35,21 @@ $matched = $matcher->matchValue($node, []);  // true / false
 
 ## Requirements
 
-| | |
-|---|---|
+| |          |
+|---|----------|
 | PHP | **8.1+** |
-| nikic/php-parser | **^5** |
+| nikic/php-parser | **^5.0**  |
 
 ## Installation
 
 ```bash
+composer config repositories.ast-matcher vcs https://github.com/EzzalddeenAli/php-parser-matcher
+
 composer require fleet/ast-matcher
+
+#or
+
+composer require fleet/ast-matcher:dev-master
 ```
 
 ---
